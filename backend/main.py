@@ -26,8 +26,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-API-Key", "X-Operator-Key"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(inquiry_router)
