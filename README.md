@@ -98,7 +98,7 @@ except Exception as e:
 
 동일한 API 엔드포인트(`POST /api/v1/inquiries/respond`)가 `mode` 파라미터에 따라 다른 응답을 반환합니다.
 
-- **User 모드**: `{"answer": "..."}` — 최종 답변만 노출. 내부 분류 결과나 신뢰도는 전달하지 않습니다.
+- **User 모드**: `{"answer": "...", "conversation_id": "..."}` — 최종 답변과 대화 ID만 노출. 내부 분류 결과나 신뢰도는 전달하지 않습니다.
 - **Operator 모드**: category, confidence, execution_trace, latency_ms 등 전체 메타데이터를 반환합니다.
 
 이 설계의 이유는 두 가지입니다.
@@ -107,7 +107,15 @@ except Exception as e:
 
 운영자 모드는 `X-Operator-Key` 헤더로 별도 인증합니다.
 
-### 4. DB 선택적 활성화
+### 4. 멀티턴 대화 지원
+
+`conversation_id`를 통해 이전 대화 이력을 로드하고, 문맥을 유지한 채 답변을 생성합니다.
+
+- 첫 요청 시 `conversation_id`를 생략하면 새 대화가 시작되고, 응답에 새 ID가 반환됩니다.
+- 이후 요청에 해당 `conversation_id`를 전달하면 이전 메시지를 `chat_history`로 복원하여 라우팅과 답변 생성에 활용합니다.
+- DB 없이 실행하는 경우 대화 이력은 저장되지 않으며, 각 요청은 독립적으로 처리됩니다.
+
+### 5. DB 선택적 활성화
 
 `DATABASE_URL` 환경 변수를 설정하지 않으면 DB 저장 로직이 아예 실행되지 않습니다. DB 저장 실패가 발생해도 고객 응답에는 영향을 주지 않습니다.
 
@@ -124,15 +132,25 @@ async def _save_to_db(self, ...):
 
 이를 통해 로컬 개발 시 PostgreSQL 없이도 전체 기능을 실행할 수 있으며, DB 장애가 서비스 중단으로 이어지지 않습니다.
 
+### 6. LangSmith 기반 평가 파이프라인
+
+Safety, Router, Expert 에이전트 전체 파이프라인을 LangSmith로 체계적으로 평가합니다.
+
+- **Safety 정확도** (`safety_correct`): expected_safe vs 실제 safety_flag — False Positive / Negative 추적
+- **라우팅 정확도** (`routing_correct`): expected_category vs 실제 category
+- **Fallback 정확도** (`routing_fallback`): 신뢰도 기반 Fallback 발동 여부
+- **답변 품질** (`quality_relevance`, `quality_completeness`, `quality_safety`): Judge LLM(gpt-4o)이 관련성·완결성·안전성을 1~5점으로 평가
+
+난이도(easy/medium/hard)와 텍스트 길이(short/long) 필터를 지원하여 엣지 케이스를 집중적으로 평가할 수 있습니다.
+
 ---
 
-## 현재 한계 및 개선 가능 사항
+## 개선 가능 사항
 
 | 항목 | 현재 상태 | 개선 방향 |
 |---|---|---|
-| 멀티턴 대화 | 미지원 (단일 문의 단위 처리) | LangGraph의 `checkpointer`로 대화 히스토리 유지 |
-| 모니터링 | 로그 기반 | LangSmith 또는 OpenTelemetry 연동 |
 | 답변 생성 | 프롬프트 기반 일반 답변 | 사내 FAQ/정책 문서를 벡터 DB에 적재하여 RAG 적용, 실제 정책에 근거한 정확한 답변 생성 |
+| 모니터링 | LangSmith 트레이싱 | OpenTelemetry 연동으로 프로덕션 모니터링 강화 |
 
 ---
 
@@ -167,7 +185,7 @@ inquiry_triage_ai/
 │   │   ├── config/          # 설정, DB, Rate Limiter
 │   │   ├── graphs/          # LangGraph 상태 그래프 (inquiry_graph)
 │   │   ├── prompts/         # 각 에이전트별 프롬프트
-│   │   ├── repositories/    # DB 저장 레이어
+│   │   ├── repositories/    # DB 저장 레이어 (문의 기록 + 대화 이력)
 │   │   ├── schemas/         # Pydantic 스키마 (InquiryState, RouterOutput, ExpertOutput)
 │   │   ├── services/        # 비즈니스 로직 (InquiryService)
 │   │   └── api/             # FastAPI 라우터
@@ -233,8 +251,20 @@ uvicorn main:app --reload
 # 유닛 / 통합 테스트
 uv run pytest
 
-# LangSmith 평가 (LANGSMITH_API_KEY 설정 필요)
-uv run python -m tests.eval.langsmith_eval
+# LangSmith 평가 (LANGSMITH_API_KEY 및 OPENAI_API_KEY 설정 필요)
+# 데이터셋 업로드 (최초 1회)
+uv run python -m tests.eval.langsmith_eval upload
+
+# 전체 평가 실행
+uv run python -m tests.eval.langsmith_eval run
+
+# 특정 항목만 평가
+uv run python -m tests.eval.langsmith_eval run --target safety
+uv run python -m tests.eval.langsmith_eval run --target router
+uv run python -m tests.eval.langsmith_eval run --target quality
+
+# 난이도 / 텍스트 길이 필터
+uv run python -m tests.eval.langsmith_eval run --difficulty hard --length long
 ```
 
 ### Frontend
@@ -274,7 +304,8 @@ npm run dev
   "mode": "user",
   "user_id": "user-123",
   "channel": "web",
-  "locale": "ko"
+  "locale": "ko",
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
@@ -285,12 +316,14 @@ npm run dev
 | `user_id` | string | - | 사용자 ID |
 | `channel` | string | - | 문의 채널 |
 | `locale` | string | - | 로케일 |
+| `conversation_id` | string | - | 대화 ID (멀티턴용, user 모드 전용) |
 
 **Response: User Mode**
 
 ```json
 {
-  "answer": "결제 중복 건에 대해 확인 후 환불 처리해 드리겠습니다."
+  "answer": "결제 중복 건에 대해 확인 후 환불 처리해 드리겠습니다.",
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
