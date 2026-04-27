@@ -33,6 +33,10 @@ class InquiryRequest(BaseModel):
         description="응답 모드. user=최종 답변만, operator=전체 처리 메타데이터 포함",
     )
     conversation_id: Optional[str] = Field(default=None, description="대화 ID (멀티턴용, user 모드 전용)")
+    agent_version: Literal["v1", "v2"] = Field(
+        default="v1",
+        description="에이전트 버전. v1=라우터 방식, v2=Tool Calling 방식",
+    )
 
 
 class ExecutionTraceItem(BaseModel):
@@ -119,6 +123,7 @@ async def respond_to_inquiry(
         channel=body.channel,
         locale=body.locale,
         conversation_id=body.conversation_id if body.mode == "user" else None,
+        agent_version=body.agent_version,
     )
 
     if "error" in result:
@@ -145,6 +150,8 @@ async def respond_to_inquiry(
         "category": result.get("category"),
         "confidence": result.get("confidence"),
         "selected_agent": result.get("selected_agent"),
+        "selected_agents": result.get("selected_agents"),
+        "agent_version": result.get("agent_version", "v1"),
         "answer": result.get("answer"),
         "fallback_used": result.get("fallback_used", False),
         "routing_reason": result.get("routing_reason"),

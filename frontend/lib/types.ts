@@ -18,6 +18,8 @@ export interface OperatorInquiryResponse {
   category: string | null;
   confidence: number | null;
   selected_agent: string | null;
+  selected_agents: string[] | null;
+  agent_version: "v1" | "v2";
   answer: string | null;
   fallback_used: boolean;
   routing_reason: string | null;
@@ -35,3 +37,4 @@ export interface ApiErrorResponse {
 }
 
 export type InquiryMode = "user" | "operator";
+export type AgentVersion = "v1" | "v2";

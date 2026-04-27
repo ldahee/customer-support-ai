@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     shipping_model: str = "gpt-4o-mini"
     fallback_model: str = "gpt-4o-mini"
     safety_model: str = "gpt-4o-mini"
+    orchestrator_model: str = "gpt-4o-mini"
+    synthesizer_model: str = "gpt-4o-mini"
 
     # Routing policy
     routing_confidence_low_threshold: float = 0.50
@@ -31,7 +33,12 @@ class Settings(BaseSettings):
 
     # Security
     # ALLOWED_ORIGINS: JSON 배열 또는 쉼표 구분 문자열 e.g. '["https://app.example.com"]' 또는 'https://app.example.com'
-    allowed_origins: List[str] = ["http://localhost:3000"]
+    allowed_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
     # API 키가 설정된 경우 모든 요청에 X-API-Key 헤더 필요
     api_key: Optional[str] = None
     # 운영자 모드(mode=operator) 접근에 필요한 별도 키

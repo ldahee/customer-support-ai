@@ -23,7 +23,8 @@
   "user_id": "user-123",
   "channel": "web",
   "locale": "ko",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000"
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
+  "agent_version": "v1"
 }
 ```
 
@@ -35,6 +36,14 @@
 | `channel` | string | - | 문의 채널 |
 | `locale` | string | - | 로케일 |
 | `conversation_id` | string | - | 대화 ID (멀티턴용, user 모드 전용) |
+| `agent_version` | `"v1"` \| `"v2"` | - | 에이전트 버전 (기본: `v1`) |
+
+**`agent_version` 차이**
+
+| 버전 | 방식 | 복합 문의 처리 |
+|---|---|---|
+| `v1` | 라우터가 카테고리 분류 → 단일 전문가 호출 | 핵심 의도 카테고리 하나로 처리 |
+| `v2` | 오케스트레이터 LLM이 tool 직접 선택 | 복수 전문가 병렬 호출 후 합성 |
 
 **Response: User Mode**
 
@@ -45,13 +54,15 @@
 }
 ```
 
-**Response: Operator Mode**
+**Response: Operator Mode (v1)**
 
 ```json
 {
   "category": "billing",
   "confidence": 0.95,
   "selected_agent": "billing_expert_agent",
+  "selected_agents": null,
+  "agent_version": "v1",
   "answer": "결제 중복 건에 대해 확인 후 환불 처리해 드리겠습니다.",
   "fallback_used": false,
   "routing_reason": "결제/환불 관련 문의로 판단",
@@ -63,6 +74,29 @@
     {"node_name": "response_finalize_node", "status": "completed", "duration_ms": 0}
   ],
   "latency_ms": 1720
+}
+```
+
+**Response: Operator Mode (v2, 복합 문의 예시)**
+
+```json
+{
+  "category": "multi",
+  "confidence": null,
+  "selected_agent": "orchestrator",
+  "selected_agents": ["billing_expert", "account_expert"],
+  "agent_version": "v2",
+  "answer": "결제 실패와 로그인 문제를 함께 확인해 드리겠습니다...",
+  "fallback_used": false,
+  "routing_reason": null,
+  "execution_trace": [
+    {"node_name": "input_node", "status": "completed", "duration_ms": 0},
+    {"node_name": "safety_check_node", "status": "completed", "duration_ms": 298},
+    {"node_name": "orchestrator_node", "status": "multi_expert", "duration_ms": 1540},
+    {"node_name": "synthesizer_node", "status": "completed", "duration_ms": 610},
+    {"node_name": "response_finalize_node", "status": "completed", "duration_ms": 0}
+  ],
+  "latency_ms": 2490
 }
 ```
 

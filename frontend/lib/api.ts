@@ -1,4 +1,5 @@
 import type {
+  AgentVersion,
   InquiryMode,
   OperatorInquiryResponse,
   UserInquiryResponse,
@@ -16,6 +17,7 @@ interface InquiryRequestBody {
   locale?: string;
   mode: InquiryMode;
   conversation_id?: string;
+  agent_version?: AgentVersion;
 }
 
 async function postInquiry<T>(body: InquiryRequestBody): Promise<T> {
@@ -55,10 +57,12 @@ export async function submitUserInquiry(
 }
 
 export async function submitOperatorInquiry(
-  inquiryText: string
+  inquiryText: string,
+  agentVersion: AgentVersion = "v1"
 ): Promise<OperatorInquiryResponse> {
   return postInquiry<OperatorInquiryResponse>({
     inquiry_text: inquiryText,
     mode: "operator",
+    agent_version: agentVersion,
   });
 }

@@ -9,6 +9,7 @@ from typing import Optional
 
 from app.config.database import is_db_enabled, _session_factory
 from app.graphs.inquiry_graph import inquiry_graph
+from app.graphs.inquiry_graph_v2 import inquiry_graph_v2
 from app.repositories.inquiry_repository import ConversationRepository, InquiryRepository
 from app.schemas.inquiry_state import InquiryState
 
@@ -23,6 +24,7 @@ class InquiryService:
         channel: Optional[str] = None,
         locale: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        agent_version: str = "v1",
     ) -> dict:
         """
         문의를 처리하고 최종 응답을 반환합니다.
@@ -44,7 +46,10 @@ class InquiryService:
             "confidence": None,
             "routing_reason": None,
             "selected_agent": None,
+            "selected_agents": None,
+            "agent_version": agent_version,
             "answer": None,
+            "expert_answers": None,
             "safety_flag": None,
             "fallback_used": False,
             "retry_count": 0,
@@ -53,8 +58,9 @@ class InquiryService:
             "execution_trace": [],
         }
 
+        graph = inquiry_graph_v2 if agent_version == "v2" else inquiry_graph
         try:
-            final_state: InquiryState = await inquiry_graph.ainvoke(initial_state)
+            final_state: InquiryState = await graph.ainvoke(initial_state)
         except Exception as e:
             logger.exception("inquiry_graph execution failed: %s", e)
             return {
@@ -66,12 +72,14 @@ class InquiryService:
 
         latency_ms = int((time.monotonic() - start_time) * 1000)
         logger.info(
-            "[%s] process_inquiry completed in %dms | category=%s confidence=%.2f agent=%s fallback=%s",
+            "[%s] process_inquiry completed in %dms | version=%s category=%s confidence=%.2f agent=%s agents=%s fallback=%s",
             final_state.get("inquiry_id"),
             latency_ms,
+            agent_version,
             final_state.get("category"),
             final_state.get("confidence") or 0.0,
             final_state.get("selected_agent"),
+            final_state.get("selected_agents"),
             final_state.get("fallback_used"),
         )
 
@@ -89,6 +97,8 @@ class InquiryService:
             "category": final_state.get("category"),
             "confidence": final_state.get("confidence"),
             "selected_agent": final_state.get("selected_agent"),
+            "selected_agents": final_state.get("selected_agents"),
+            "agent_version": agent_version,
             "answer": answer,
             "fallback_used": final_state.get("fallback_used", False),
             "routing_reason": final_state.get("routing_reason"),

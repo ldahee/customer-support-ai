@@ -25,9 +25,12 @@ class InquiryState(TypedDict):
     confidence: Optional[float]
     routing_reason: Optional[str]
     selected_agent: Optional[str]
+    selected_agents: Optional[list[str]]  # v2: 복수 전문가 추적
+    agent_version: Optional[str]          # "v1" | "v2"
 
     # Response
     answer: Optional[str]
+    expert_answers: Optional[dict[str, str]]  # v2: synthesizer 입력용 중간 결과
 
     # Safety
     safety_flag: Optional[bool]

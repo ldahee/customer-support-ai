@@ -8,7 +8,7 @@ import OperatorInquiryForm from "@/components/operator/OperatorInquiryForm";
 import ProcessingResult from "@/components/operator/ProcessingResult";
 import OperatorHelpModal from "@/components/operator/OperatorHelpModal";
 import { submitOperatorInquiry } from "@/lib/api";
-import type { OperatorInquiryResponse } from "@/lib/types";
+import type { AgentVersion, OperatorInquiryResponse } from "@/lib/types";
 
 export default function OperatorPage() {
   const [inputText, setInputText] = useState("");
@@ -16,6 +16,7 @@ export default function OperatorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -26,7 +27,7 @@ export default function OperatorPage() {
     setError(null);
 
     try {
-      const data = await submitOperatorInquiry(trimmed);
+      const data = await submitOperatorInquiry(trimmed, agentVersion);
       setResult(data);
     } catch (err) {
       setError(
@@ -73,6 +74,8 @@ export default function OperatorPage() {
                 onChange={setInputText}
                 onSubmit={handleFormSubmit}
                 isLoading={isLoading}
+                agentVersion={agentVersion}
+                onVersionChange={setAgentVersion}
               />
             </div>
 

@@ -13,6 +13,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   shipping: "배송",
   general: "일반",
   safety: "Safety",
+  multi: "복합",
   unknown: "알 수 없음",
 };
 
@@ -25,6 +26,7 @@ function CategoryBadge({ category }: { category: string | null }) {
     shipping: "bg-teal-100 text-teal-700",
     general: "bg-gray-100 text-gray-600",
     safety: "bg-red-100 text-red-700",
+    multi: "bg-indigo-100 text-indigo-700",
   };
   const colorClass = category
     ? (colorMap[category] ?? "bg-gray-100 text-gray-600")
@@ -33,6 +35,20 @@ function CategoryBadge({ category }: { category: string | null }) {
   return (
     <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${colorClass}`}>
       {label}
+    </span>
+  );
+}
+
+function VersionBadge({ version }: { version: "v1" | "v2" }) {
+  return (
+    <span
+      className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${
+        version === "v2"
+          ? "bg-emerald-100 text-emerald-700"
+          : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {version === "v2" ? "v2 · Tool Calling" : "v1 · 라우터"}
     </span>
   );
 }
@@ -47,6 +63,8 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 export default function ProcessingResult({ result }: ProcessingResultProps) {
+  const isMultiExpert = result.selected_agents && result.selected_agents.length > 1;
+
   return (
     <div className="space-y-5">
       {/* 메타데이터 카드 */}
@@ -55,14 +73,31 @@ export default function ProcessingResult({ result }: ProcessingResultProps) {
           분류 결과
         </h3>
         <dl className="grid grid-cols-2 gap-4">
+          <InfoRow label="에이전트 버전">
+            <VersionBadge version={result.agent_version ?? "v1"} />
+          </InfoRow>
+
           <InfoRow label="카테고리">
             <CategoryBadge category={result.category} />
           </InfoRow>
 
           <InfoRow label="선택된 에이전트">
-            <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-              {result.selected_agent ?? "-"}
-            </span>
+            {isMultiExpert ? (
+              <div className="flex flex-wrap gap-1">
+                {result.selected_agents!.map((agent) => (
+                  <span
+                    key={agent}
+                    className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded"
+                  >
+                    {agent}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                {result.selected_agent ?? "-"}
+              </span>
+            )}
           </InfoRow>
 
           <InfoRow label="Fallback 여부">
