@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,6 +13,14 @@ from app.mcp.client import mcp_manager
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+# pydantic-settings 처리 전 raw 환경변수 값 출력 (진단용)
+_logger = logging.getLogger(__name__)
+_logger.info(
+    "RAW ENV: MCP_FAQ_URL=%r  MCP_SLACK_URL=%r",
+    os.environ.get("MCP_FAQ_URL"),
+    os.environ.get("MCP_SLACK_URL"),
 )
 
 
