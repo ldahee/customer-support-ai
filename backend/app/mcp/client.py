@@ -33,10 +33,6 @@ class MCPClientManager:
             return []
         return self._tools_by_server.get(server_name, [])
 
-    def get_tools_for_expert(self, expert_name: str) -> List[BaseTool]:
-        """get_tools의 별칭 (하위 호환성 유지)."""
-        return self.get_tools(expert_name)
-
     async def connect(self) -> None:
         if not settings.mcp_enabled:
             logger.info("MCP disabled: no MCP server URLs configured")

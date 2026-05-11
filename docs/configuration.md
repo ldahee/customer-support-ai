@@ -19,7 +19,7 @@
 | `DATABASE_URL` | - | PostgreSQL 연결 URL (미설정 시 DB 저장 비활성화) |
 | `API_KEY` | - | API 인증 키 (미설정 시 인증 불필요) |
 | `OPERATOR_API_KEY` | - | 운영자 모드 인증 키 |
-| `ALLOWED_ORIGINS` | `["http://localhost:3000"]` | CORS 허용 오리진 (JSON 배열) |
+| `ALLOWED_ORIGINS` | `["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"]` | CORS 허용 오리진 (JSON 배열) |
 | `RATE_LIMIT` | `20/minute` | 요청 속도 제한 |
 | `DAILY_LIMIT` | `10` | 사용자당 일별 요청 제한 (KST 자정 기준 초기화) |
 | `ENVIRONMENT` | `development` | 실행 환경 |

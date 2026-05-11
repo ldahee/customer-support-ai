@@ -28,12 +28,7 @@ class Settings(BaseSettings):
     # Database
     database_url: Optional[str] = None
 
-    # MCP 서버 설정 (선택적 — 미설정 시 MCP 비활성화)
-    mcp_billing_url: Optional[str] = None
-    mcp_account_url: Optional[str] = None
-    mcp_shipping_url: Optional[str] = None
-    mcp_technical_support_url: Optional[str] = None
-    # v3 MCP 서버
+    # MCP 서버 설정 (v3 전용, 선택적 — 미설정 시 MCP 비활성화)
     mcp_faq_url: Optional[str] = None         # FAQSearch MCP 서버 URL
     mcp_slack_url: Optional[str] = None       # SlackNotify MCP 서버 URL
     mcp_connect_timeout: float = 5.0
@@ -48,26 +43,11 @@ class Settings(BaseSettings):
 
     @property
     def mcp_enabled(self) -> bool:
-        return any([
-            self.mcp_billing_url,
-            self.mcp_account_url,
-            self.mcp_shipping_url,
-            self.mcp_technical_support_url,
-            self.mcp_faq_url,
-            self.mcp_slack_url,
-        ])
+        return any([self.mcp_faq_url, self.mcp_slack_url])
 
     @property
     def mcp_server_configs(self) -> Dict[str, Dict[str, Any]]:
         configs: Dict[str, Dict[str, Any]] = {}
-        if self.mcp_billing_url:
-            configs["billing"] = {"url": self.mcp_billing_url, "transport": "streamable_http"}
-        if self.mcp_account_url:
-            configs["account"] = {"url": self.mcp_account_url, "transport": "streamable_http"}
-        if self.mcp_shipping_url:
-            configs["shipping"] = {"url": self.mcp_shipping_url, "transport": "streamable_http"}
-        if self.mcp_technical_support_url:
-            configs["technical_support"] = {"url": self.mcp_technical_support_url, "transport": "streamable_http"}
         if self.mcp_faq_url:
             configs["faq"] = {"url": self.mcp_faq_url, "transport": "streamable_http"}
         if self.mcp_slack_url:
