@@ -18,6 +18,9 @@ import os
 import httpx
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -32,7 +35,16 @@ if not SLACK_WEBHOOK_URL:
     logger.warning("SLACK_WEBHOOK_URL이 설정되지 않았습니다. 알림이 발송되지 않습니다.")
 
 mcp = FastMCP("slack-notify", host=HOST, port=PORT)
-asgi_app = mcp.streamable_http_app()
+
+
+async def _health(request):
+    return JSONResponse({"status": "ok"})
+
+
+asgi_app = Starlette(routes=[
+    Route("/health", _health),
+    Mount("/", app=mcp.streamable_http_app()),
+])
 
 
 @mcp.tool()
