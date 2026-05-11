@@ -13,6 +13,7 @@ interface OperatorInquiryFormProps {
   faqCategory: string;
   onFaqCategoryChange: (category: string) => void;
   faqCategories: string[];
+  faqCategoriesLoading?: boolean;
 }
 
 const VERSION_OPTIONS: { value: AgentVersion; label: string; description: string }[] = [
@@ -31,6 +32,7 @@ export default function OperatorInquiryForm({
   faqCategory,
   onFaqCategoryChange,
   faqCategories,
+  faqCategoriesLoading = false,
 }: OperatorInquiryFormProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -71,7 +73,9 @@ export default function OperatorInquiryForm({
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
             FAQ 카테고리
           </p>
-          {faqCategories.length === 0 ? (
+          {faqCategoriesLoading ? (
+            <p className="text-xs text-gray-400">카테고리 로딩 중...</p>
+          ) : faqCategories.length === 0 ? (
             <p className="text-xs text-gray-400">
               색인된 카테고리가 없습니다. indexer.py를 실행해 FAQ를 색인하세요.
             </p>

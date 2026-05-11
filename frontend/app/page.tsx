@@ -19,6 +19,7 @@ export default function UserPage() {
   const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
   const [faqCategory, setFaqCategory] = useState("");
   const [faqCategories, setFaqCategories] = useState<string[]>([]);
+  const [faqCategoriesLoading, setFaqCategoriesLoading] = useState(false);
   const [faqQuestions, setFaqQuestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +29,10 @@ export default function UserPage() {
 
   useEffect(() => {
     if (agentVersion === "v3") {
-      fetchFaqCategories().then(setFaqCategories);
+      setFaqCategoriesLoading(true);
+      fetchFaqCategories()
+        .then(setFaqCategories)
+        .finally(() => setFaqCategoriesLoading(false));
     }
   }, [agentVersion]);
 
@@ -158,6 +162,7 @@ export default function UserPage() {
             faqCategory={faqCategory}
             onFaqCategoryChange={setFaqCategory}
             faqCategories={faqCategories}
+            faqCategoriesLoading={faqCategoriesLoading}
           />
         </div>
       </div>

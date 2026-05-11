@@ -19,11 +19,15 @@ export default function OperatorPage() {
   const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
   const [faqCategory, setFaqCategory] = useState("");
   const [faqCategories, setFaqCategories] = useState<string[]>([]);
+  const [faqCategoriesLoading, setFaqCategoriesLoading] = useState(false);
   const [faqQuestions, setFaqQuestions] = useState<string[]>([]);
 
   useEffect(() => {
     if (agentVersion === "v3") {
-      fetchFaqCategories().then(setFaqCategories);
+      setFaqCategoriesLoading(true);
+      fetchFaqCategories()
+        .then(setFaqCategories)
+        .finally(() => setFaqCategoriesLoading(false));
     } else {
       setFaqCategory("");
       setFaqQuestions([]);
@@ -103,6 +107,7 @@ export default function OperatorPage() {
                 faqCategory={faqCategory}
                 onFaqCategoryChange={setFaqCategory}
                 faqCategories={faqCategories}
+                faqCategoriesLoading={faqCategoriesLoading}
               />
             </div>
 
