@@ -42,6 +42,16 @@ from app.schemas.inquiry_state import InquiryState
 
 logger = logging.getLogger(__name__)
 
+# TODO: 추후 LLM 기반 판단으로 교체
+_ESCALATION_KEYWORDS = [
+    "상담사", "상담원", "담당자", "직원 연결", "사람이랑", "사람과",
+    "전화 연결", "통화", "이관", "연결해줘", "연결해달라", "연결 부탁",
+]
+
+
+def _is_escalation_request(text: str) -> bool:
+    return any(kw in text for kw in _ESCALATION_KEYWORDS)
+
 
 async def faq_retrieval_node(state: InquiryState) -> dict:
     """FAQSearch MCP 서버에서 inquiry와 관련된 FAQ를 검색합니다."""
@@ -104,6 +114,19 @@ async def orchestrator_node_v3(state: InquiryState) -> dict:
             "selected_agent": "general_fallback_agent",
             "selected_agents": [],
             "fallback_used": True,
+            "execution_trace": trace,
+        }
+
+    if _is_escalation_request(state["inquiry_text"]):
+        logger.info("[%s] orchestrator_node_v3: escalation request detected", inquiry_id)
+        trace.append({"node_name": "orchestrator_node_v3", "status": "escalation_detected", "duration_ms": 0})
+        return {
+            "answer": "상담사 연결 요청을 접수했습니다. 담당 상담원이 곧 연락드릴 예정입니다. 잠시만 기다려 주세요.",
+            "selected_agent": "escalation",
+            "selected_agents": [],
+            "fallback_used": False,
+            "escalation_requested": True,
+            "llm_call_count": state.get("llm_call_count", 0),
             "execution_trace": trace,
         }
 
@@ -227,15 +250,23 @@ async def slack_notify_node(state: InquiryState) -> dict:
     if len(state["inquiry_text"]) > 200:
         inquiry_preview += "..."
 
-    message = (
-        f":warning: *고객 문의 처리 실패 알림*\n\n"
-        f"*문의 ID*: `{state.get('inquiry_id', 'N/A')}`\n"
-        f"*문의 내용*: {inquiry_preview}\n"
-        f"*카테고리*: {state.get('category') or 'unknown'}\n"
-        f"*선택된 에이전트*: {state.get('selected_agent') or 'none'}\n"
-        f"*에러*: {state.get('error') or 'fallback triggered'}\n"
-        f"*실행 이력*: {len(state.get('execution_trace', []))}개 노드"
-    )
+    if state.get("escalation_requested"):
+        message = (
+            f":telephone_receiver: *상담사 연결 요청*\n\n"
+            f"*문의 ID*: `{state.get('inquiry_id', 'N/A')}`\n"
+            f"*문의 내용*: {inquiry_preview}\n"
+            f"*카테고리*: {state.get('category') or 'unknown'}\n"
+        )
+    else:
+        message = (
+            f":warning: *고객 문의 처리 실패 알림*\n\n"
+            f"*문의 ID*: `{state.get('inquiry_id', 'N/A')}`\n"
+            f"*문의 내용*: {inquiry_preview}\n"
+            f"*카테고리*: {state.get('category') or 'unknown'}\n"
+            f"*선택된 에이전트*: {state.get('selected_agent') or 'none'}\n"
+            f"*에러*: {state.get('error') or 'fallback triggered'}\n"
+            f"*실행 이력*: {len(state.get('execution_trace', []))}개 노드"
+        )
 
     try:
         async with mcp_manager.session_tools("slack") as tools:
@@ -275,7 +306,7 @@ async def slack_notify_node(state: InquiryState) -> dict:
 def route_after_finalize(
     state: InquiryState,
 ) -> Literal["slack_notify_node", "__end__"]:
-    if state.get("fallback_used"):
+    if state.get("escalation_requested") or state.get("fallback_used"):
         return "slack_notify_node"
     return END
 

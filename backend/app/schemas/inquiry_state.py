@@ -43,6 +43,7 @@ class InquiryState(TypedDict):
 
     # Control
     fallback_used: bool
+    escalation_requested: bool  # 사용자가 명시적으로 상담사 연결 요청 시 True
     retry_count: int
     llm_call_count: int
     error: Optional[str]

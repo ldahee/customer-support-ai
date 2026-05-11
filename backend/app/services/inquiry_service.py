@@ -57,6 +57,7 @@ class InquiryService:
             "faq_category": faq_category or None,
             "safety_flag": None,
             "fallback_used": False,
+            "escalation_requested": False,
             "retry_count": 0,
             "llm_call_count": 0,
             "error": None,
