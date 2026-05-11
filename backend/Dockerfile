@@ -4,4 +4,4 @@ RUN pip install uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --frozen
 COPY . .
-CMD ["/app/.venv/bin/fastapi", "run", "main.py", "--host", "0.0.0.0"]
+CMD /app/.venv/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
