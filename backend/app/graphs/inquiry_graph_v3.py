@@ -74,11 +74,19 @@ async def faq_retrieval_node(state: InquiryState) -> dict:
                 return {"faq_context": None, "execution_trace": trace}
 
             result = await faq_tool.ainvoke({"query": state["inquiry_text"], "category": category})
+            # langchain_mcp_adapters가 content block 목록으로 반환할 수 있으므로 문자열로 변환
+            if isinstance(result, list):
+                result = "\n".join(
+                    b.get("text", "") if isinstance(b, dict) else str(b)
+                    for b in result
+                )
+            elif isinstance(result, dict):
+                result = result.get("text", str(result))
             duration_ms = int((time.monotonic() - start) * 1000)
             if result:
                 logger.info(
                     "[%s] faq_retrieval_node: %d chars fetched in %dms (category=%s)",
-                    inquiry_id, len(result), duration_ms, category or "전체",
+                    inquiry_id, len(str(result)), duration_ms, category or "전체",
                 )
             trace.append({
                 "node_name": "faq_retrieval_node",

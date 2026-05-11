@@ -148,7 +148,9 @@ export default function ProcessingResult({ result }: ProcessingResultProps) {
             검색된 FAQ{result.faq_category && <span className="ml-2 font-normal normal-case text-violet-300">· {result.faq_category}</span>}
           </h3>
           <pre className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
-            {result.faq_context}
+            {typeof result.faq_context === "string"
+              ? result.faq_context
+              : JSON.stringify(result.faq_context, null, 2)}
           </pre>
         </div>
       )}
