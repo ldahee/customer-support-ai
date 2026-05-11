@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     mcp_connect_timeout: float = 5.0
     mcp_tool_timeout: float = 10.0
 
+    @field_validator("mcp_faq_url", "mcp_slack_url", mode="before")
+    @classmethod
+    def normalize_mcp_url(cls, v: Optional[str]) -> Optional[str]:
+        if v and not v.startswith("http"):
+            return f"https://{v}"
+        return v
+
     # FAQ MCP 서버 자체 설정 (mcp_servers/faq_search/server.py 에서 읽음)
     faq_chroma_path: str = "./chroma_db"
     faq_collection_name: str = "faq"
