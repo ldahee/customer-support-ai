@@ -66,4 +66,4 @@ async def slack_notify(message: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http", path="/mcp")
+    mcp.run(transport="streamable-http")

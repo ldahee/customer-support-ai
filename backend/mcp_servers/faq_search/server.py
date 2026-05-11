@@ -97,4 +97,4 @@ async def faq_search(query: str, category: str = "", top_k: int = 3) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http", path="/mcp")
+    mcp.run(transport="streamable-http")
