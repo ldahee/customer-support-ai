@@ -31,8 +31,11 @@ class MCPClientManager:
         if settings.mcp_enabled:
             self._is_enabled = True
             logger.info("MCP enabled: %s", list(settings.mcp_server_configs.keys()))
+            for name, cfg in settings.mcp_server_configs.items():
+                logger.info("  - %s: %s", name, cfg.get("url", "(없음)"))
         else:
-            logger.info("MCP disabled: no MCP server URLs configured")
+            logger.info("MCP disabled (mcp_faq_url=%r, mcp_slack_url=%r)",
+                        settings.mcp_faq_url, settings.mcp_slack_url)
 
     async def disconnect(self) -> None:
         self._is_enabled = False
