@@ -2,4 +2,5 @@
 builder = "nixpacks"
 
 [deploy]
+startCommand = "uv run fastapi run main.py --host 0.0.0.0"
 restartPolicyType = "on_failure"

@@ -3,6 +3,3 @@ nixPkgs = ["uv"]
 
 [phases.install]
 cmds = ["uv sync --no-dev --frozen"]
-
-[variables]
-PATH = "/app/.venv/bin:$PATH"
