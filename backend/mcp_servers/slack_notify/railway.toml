@@ -1,6 +1,7 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uv run python -m mcp_servers.slack_notify.server"
+startCommand = "/app/.venv/bin/python -m mcp_servers.slack_notify.server"
 restartPolicyType = "on_failure"
