@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     @field_validator("mcp_faq_url", "mcp_slack_url", mode="before")
     @classmethod
     def normalize_mcp_url(cls, v: Optional[str]) -> Optional[str]:
-        if v and not v.startswith("http"):
+        if not v:
+            return None
+        if not v.startswith("http"):
             return f"https://{v}"
         return v
 

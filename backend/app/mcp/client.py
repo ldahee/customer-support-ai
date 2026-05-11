@@ -28,14 +28,21 @@ class MCPClientManager:
         return self._is_enabled
 
     async def connect(self) -> None:
+        logger.info(
+            "MCP URL values: faq=%r, slack=%r",
+            settings.mcp_faq_url, settings.mcp_slack_url,
+        )
         if settings.mcp_enabled:
             self._is_enabled = True
             logger.info("MCP enabled: %s", list(settings.mcp_server_configs.keys()))
             for name, cfg in settings.mcp_server_configs.items():
                 logger.info("  - %s: %s", name, cfg.get("url", "(없음)"))
+            all_urls = {"faq": settings.mcp_faq_url, "slack": settings.mcp_slack_url}
+            for name, url in all_urls.items():
+                if name not in settings.mcp_server_configs:
+                    logger.warning("  - %s: DISABLED (loaded value: %r)", name, url)
         else:
-            logger.info("MCP disabled (mcp_faq_url=%r, mcp_slack_url=%r)",
-                        settings.mcp_faq_url, settings.mcp_slack_url)
+            logger.info("MCP disabled")
 
     async def disconnect(self) -> None:
         self._is_enabled = False
