@@ -18,4 +18,4 @@ else
     echo "[start.sh] 경고: $DATA_DIR 폴더가 없습니다. 빈 컬렉션으로 서버를 시작합니다."
 fi
 
-exec uv run python -m mcp_servers.faq_search.server
+exec /app/.venv/bin/uvicorn mcp_servers.faq_search.server:asgi_app --host 0.0.0.0 --port "${PORT:-8010}"

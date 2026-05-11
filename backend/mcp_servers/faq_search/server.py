@@ -45,6 +45,7 @@ except Exception as e:
     _collection = None
 
 mcp = FastMCP("faq-search", host=HOST, port=PORT)
+asgi_app = mcp.streamable_http_app()
 
 
 @mcp.tool()
