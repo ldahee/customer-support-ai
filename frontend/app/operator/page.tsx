@@ -7,7 +7,7 @@ import SampleExamples from "@/components/common/SampleExamples";
 import OperatorInquiryForm from "@/components/operator/OperatorInquiryForm";
 import ProcessingResult from "@/components/operator/ProcessingResult";
 import OperatorHelpModal from "@/components/operator/OperatorHelpModal";
-import { submitOperatorInquiry, fetchFaqCategories } from "@/lib/api";
+import { submitOperatorInquiry, fetchFaqCategories, fetchFaqQuestions } from "@/lib/api";
 import type { AgentVersion, OperatorInquiryResponse } from "@/lib/types";
 
 export default function OperatorPage() {
@@ -19,15 +19,24 @@ export default function OperatorPage() {
   const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
   const [faqCategory, setFaqCategory] = useState("");
   const [faqCategories, setFaqCategories] = useState<string[]>([]);
+  const [faqQuestions, setFaqQuestions] = useState<string[]>([]);
 
-  // v3 선택 시 카테고리 목록 로드
   useEffect(() => {
     if (agentVersion === "v3") {
       fetchFaqCategories().then(setFaqCategories);
     } else {
       setFaqCategory("");
+      setFaqQuestions([]);
     }
   }, [agentVersion]);
+
+  useEffect(() => {
+    if (faqCategory) {
+      fetchFaqQuestions(faqCategory).then(setFaqQuestions);
+    } else {
+      setFaqQuestions([]);
+    }
+  }, [faqCategory]);
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -97,7 +106,7 @@ export default function OperatorPage() {
               />
             </div>
 
-            <SampleExamples onSelect={handleExampleSelect} disabled={isLoading} />
+            <SampleExamples onSelect={handleExampleSelect} disabled={isLoading} faqQuestions={faqQuestions} />
           </section>
 
           {/* 우측: 처리 결과 */}

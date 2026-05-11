@@ -6,7 +6,7 @@ import SampleExamples from "@/components/common/SampleExamples";
 import InquiryForm from "@/components/user/InquiryForm";
 import ChatHistory from "@/components/user/ChatHistory";
 import UserHelpModal from "@/components/user/UserHelpModal";
-import { fetchFaqCategories, submitUserInquiry } from "@/lib/api";
+import { fetchFaqCategories, fetchFaqQuestions, submitUserInquiry } from "@/lib/api";
 import type { AgentVersion, ChatMessage } from "@/lib/types";
 
 export default function UserPage() {
@@ -19,6 +19,7 @@ export default function UserPage() {
   const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
   const [faqCategory, setFaqCategory] = useState("");
   const [faqCategories, setFaqCategories] = useState<string[]>([]);
+  const [faqQuestions, setFaqQuestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,6 +31,14 @@ export default function UserPage() {
       fetchFaqCategories().then(setFaqCategories);
     }
   }, [agentVersion]);
+
+  useEffect(() => {
+    if (faqCategory) {
+      fetchFaqQuestions(faqCategory).then(setFaqQuestions);
+    } else {
+      setFaqQuestions([]);
+    }
+  }, [faqCategory]);
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -71,6 +80,7 @@ export default function UserPage() {
     handleReset();
     setAgentVersion(version);
     setFaqCategory("");
+    setFaqQuestions([]);
   };
 
   const handleFormSubmit = () => submit(inputText);
@@ -104,7 +114,7 @@ export default function UserPage() {
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl px-6 py-6">
           {messages.length === 0 && !isLoading ? (
-            <SampleExamples onSelect={handleExampleSelect} disabled={isLoading} />
+            <SampleExamples onSelect={handleExampleSelect} disabled={isLoading} faqQuestions={faqQuestions} />
           ) : messages.length > 0 ? (
             <ChatHistory messages={messages} />
           ) : null}

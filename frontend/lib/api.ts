@@ -83,3 +83,16 @@ export async function fetchFaqCategories(): Promise<string[]> {
     return [];
   }
 }
+
+export async function fetchFaqQuestions(category: string): Promise<string[]> {
+  if (!category) return [];
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/v1/faq/questions?category=${encodeURIComponent(category)}`
+    );
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
