@@ -36,7 +36,8 @@
 | `channel` | string | - | 문의 채널 |
 | `locale` | string | - | 로케일 |
 | `conversation_id` | string | - | 대화 ID (멀티턴용, user 모드 전용) |
-| `agent_version` | `"v1"` \| `"v2"` | - | 에이전트 버전 (기본: `v1`) |
+| `agent_version` | `"v1"` \| `"v2"` \| `"v3"` | - | 에이전트 버전 (기본: `v1`) |
+| `faq_category` | string | - | v3 전용 FAQ 카테고리 필터 (미지정 시 전체 검색) |
 
 **`agent_version` 차이**
 
@@ -44,6 +45,7 @@
 |---|---|---|
 | `v1` | 라우터가 카테고리 분류 → 단일 전문가 호출 | 핵심 의도 카테고리 하나로 처리 |
 | `v2` | 오케스트레이터 LLM이 tool 직접 선택 | 복수 전문가 병렬 호출 후 합성 |
+| `v3` | FAQ 검색 후 오케스트레이터 LLM이 tool 선택 | FAQ 컨텍스트 주입 + 복수 전문가 병렬 호출 후 합성, fallback 시 Slack 알림 |
 
 **Response: User Mode**
 
@@ -77,6 +79,32 @@
 }
 ```
 
+**Response: Operator Mode (v3)**
+
+```json
+{
+  "category": "billing",
+  "confidence": null,
+  "selected_agent": "billing_expert",
+  "selected_agents": ["billing_expert"],
+  "agent_version": "v3",
+  "answer": "결제 중복 건에 대해 확인 후 환불 처리해 드리겠습니다.",
+  "fallback_used": false,
+  "routing_reason": null,
+  "execution_trace": [
+    {"node_name": "input_node", "status": "completed", "duration_ms": 0},
+    {"node_name": "safety_check_node", "status": "completed", "duration_ms": 290},
+    {"node_name": "faq_retrieval_node", "status": "completed", "duration_ms": 180},
+    {"node_name": "orchestrator_node", "status": "completed", "duration_ms": 830},
+    {"node_name": "response_finalize_node", "status": "completed", "duration_ms": 0}
+  ],
+  "latency_ms": 1340,
+  "mcp_connected": true,
+  "faq_context": "Q: 환불은 얼마나 걸리나요?\nA: 영업일 기준 3~5일 소요됩니다.",
+  "faq_category": "billing"
+}
+```
+
 **Response: Operator Mode (v2, 복합 문의 예시)**
 
 ```json
@@ -100,6 +128,14 @@
 }
 ```
 
+**Operator Mode 추가 필드 (v3)**
+
+| 필드 | 설명 |
+|---|---|
+| `mcp_connected` | MCP 서버 연결 여부 |
+| `faq_context` | 검색된 FAQ 컨텍스트 (MCP 미연결 또는 미검색 시 `null`) |
+| `faq_category` | 사용된 FAQ 카테고리 필터 (미지정 시 `null`) |
+
 **인증 헤더**
 
 | 헤더 | 설명 |
@@ -117,3 +153,27 @@
 | `AGENT_EXECUTION_FAILED` | 500 | 에이전트 실행 실패 |
 | `OUTPUT_PARSE_FAILED` | 500 | 라우터 출력 파싱 실패 |
 | `INTERNAL_ERROR` | 500 | 내부 서버 오류 |
+
+---
+
+## GET `/api/v1/faq/categories`
+
+색인된 FAQ 카테고리 목록을 반환합니다. `backend/data/` 폴더의 서브폴더명이 카테고리로 사용됩니다.
+
+```json
+["한국안전교통공단"]
+```
+
+`data/` 폴더가 없거나 서브폴더가 없으면 빈 배열을 반환합니다.
+
+---
+
+## GET `/api/v1/faq/questions?category={name}`
+
+지정한 카테고리 CSV에서 예시 질문을 최대 5개 무작위로 반환합니다.
+
+```json
+["교통사고 처리는 어떻게 하나요?", "운전면허 갱신 절차를 알고 싶어요."]
+```
+
+`category`를 생략하거나 해당 카테고리가 없으면 빈 배열을 반환합니다.
