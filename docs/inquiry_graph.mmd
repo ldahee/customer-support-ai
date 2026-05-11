@@ -1,0 +1,37 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	input_node(input_node)
+	safety_check_node(safety_check_node)
+	safe_response_node(safe_response_node)
+	router_node(router_node)
+	billing_agent_node(billing_agent_node)
+	account_agent_node(account_agent_node)
+	technical_support_agent_node(technical_support_agent_node)
+	shipping_agent_node(shipping_agent_node)
+	fallback_agent_node(fallback_agent_node)
+	response_finalize_node(response_finalize_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> input_node;
+	account_agent_node --> response_finalize_node;
+	billing_agent_node --> response_finalize_node;
+	fallback_agent_node --> response_finalize_node;
+	input_node --> safety_check_node;
+	router_node -.-> account_agent_node;
+	router_node -.-> billing_agent_node;
+	router_node -.-> fallback_agent_node;
+	router_node -.-> shipping_agent_node;
+	router_node -.-> technical_support_agent_node;
+	safe_response_node --> response_finalize_node;
+	safety_check_node -.-> router_node;
+	safety_check_node -.-> safe_response_node;
+	shipping_agent_node --> response_finalize_node;
+	technical_support_agent_node --> response_finalize_node;
+	response_finalize_node --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

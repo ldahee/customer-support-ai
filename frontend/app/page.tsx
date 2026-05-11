@@ -6,8 +6,8 @@ import SampleExamples from "@/components/common/SampleExamples";
 import InquiryForm from "@/components/user/InquiryForm";
 import ChatHistory from "@/components/user/ChatHistory";
 import UserHelpModal from "@/components/user/UserHelpModal";
-import { submitUserInquiry } from "@/lib/api";
-import type { ChatMessage } from "@/lib/types";
+import { fetchFaqCategories, submitUserInquiry } from "@/lib/api";
+import type { AgentVersion, ChatMessage } from "@/lib/types";
 
 export default function UserPage() {
   const [inputText, setInputText] = useState("");
@@ -16,11 +16,20 @@ export default function UserPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
+  const [faqCategory, setFaqCategory] = useState("");
+  const [faqCategories, setFaqCategories] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (agentVersion === "v3") {
+      fetchFaqCategories().then(setFaqCategories);
+    }
+  }, [agentVersion]);
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -32,7 +41,12 @@ export default function UserPage() {
     setMessages((prev) => [...prev, { role: "human", content: trimmed }]);
 
     try {
-      const result = await submitUserInquiry(trimmed, conversationId);
+      const result = await submitUserInquiry(
+        trimmed,
+        conversationId,
+        agentVersion,
+        faqCategory || undefined,
+      );
       setConversationId(result.conversation_id);
       setMessages((prev) => [...prev, { role: "ai", content: result.answer }]);
     } catch (err) {
@@ -51,6 +65,12 @@ export default function UserPage() {
     setConversationId(undefined);
     setError(null);
     setInputText("");
+  };
+
+  const handleVersionChange = (version: AgentVersion) => {
+    handleReset();
+    setAgentVersion(version);
+    setFaqCategory("");
   };
 
   const handleFormSubmit = () => submit(inputText);
@@ -123,6 +143,11 @@ export default function UserPage() {
             onChange={setInputText}
             onSubmit={handleFormSubmit}
             isLoading={isLoading}
+            agentVersion={agentVersion}
+            onVersionChange={handleVersionChange}
+            faqCategory={faqCategory}
+            onFaqCategoryChange={setFaqCategory}
+            faqCategories={faqCategories}
           />
         </div>
       </div>

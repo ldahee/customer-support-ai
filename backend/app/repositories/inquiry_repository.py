@@ -46,6 +46,7 @@ class InquiryLog(Base):
     latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     error: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    agent_version: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     execution_trace: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
 
     created_at: Mapped[datetime] = mapped_column(
@@ -114,6 +115,7 @@ class InquiryRepository:
         latency_ms: Optional[int],
         error: Optional[str],
         execution_trace: list,
+        agent_version: Optional[str] = None,
     ) -> None:
         log = InquiryLog(
             inquiry_id=inquiry_id,
@@ -133,6 +135,7 @@ class InquiryRepository:
             latency_ms=latency_ms,
             error=error,
             execution_trace=json.dumps(execution_trace, ensure_ascii=False),
+            agent_version=agent_version,
         )
         self._session.add(log)
         await self._session.commit()

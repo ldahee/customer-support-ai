@@ -1,20 +1,32 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.faq_router import router as faq_router
 from app.api.inquiry_router import router as inquiry_router
 from app.config.settings import settings
+from app.mcp.client import mcp_manager
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await mcp_manager.connect()
+    yield
+    await mcp_manager.disconnect()
+
+
 app = FastAPI(
     title="고객 문의 자동응답 시스템",
     description="LangChain + LangGraph 기반 멀티 에이전트 문의 분류 및 답변 생성 시스템",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -25,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(inquiry_router)
+app.include_router(faq_router)
 
 
 @app.get("/health", tags=["health"])

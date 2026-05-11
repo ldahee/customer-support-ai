@@ -26,6 +26,11 @@ frontend/node_modules/
 .coverage
 htmlcov/
 
+# ChromaDB (서버 시작 시 자동 생성됨)
+backend/chroma_db/
+
 # 기타
 .DS_Store
 *.log
+
+docs/*.py

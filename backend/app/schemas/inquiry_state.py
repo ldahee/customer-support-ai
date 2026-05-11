@@ -6,6 +6,7 @@ class ExecutionTraceItem(TypedDict, total=False):
     node_name: str
     status: str
     duration_ms: Optional[int]
+    error: Optional[str]
 
 
 class InquiryState(TypedDict):
@@ -31,6 +32,11 @@ class InquiryState(TypedDict):
     # Response
     answer: Optional[str]
     expert_answers: Optional[dict[str, str]]  # v2: synthesizer 입력용 중간 결과
+
+    # v3: FAQ 검색 결과 (faq_retrieval_node에서 채워짐)
+    faq_context: Optional[str]
+    # v3: FAQ 카테고리 필터 (사용자가 선택한 카테고리, 빈 문자열이면 전체 검색)
+    faq_category: Optional[str]
 
     # Safety
     safety_flag: Optional[bool]

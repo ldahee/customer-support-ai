@@ -2,6 +2,7 @@ export interface ExecutionTraceItem {
   node_name: string;
   status: string;
   duration_ms?: number;
+  error?: string;
 }
 
 export interface UserInquiryResponse {
@@ -19,12 +20,15 @@ export interface OperatorInquiryResponse {
   confidence: number | null;
   selected_agent: string | null;
   selected_agents: string[] | null;
-  agent_version: "v1" | "v2";
+  agent_version: "v1" | "v2" | "v3";
   answer: string | null;
   fallback_used: boolean;
   routing_reason: string | null;
   execution_trace: ExecutionTraceItem[];
   latency_ms: number;
+  mcp_connected?: boolean;
+  faq_context?: string;
+  faq_category?: string;
 }
 
 export interface ApiError {
@@ -37,4 +41,4 @@ export interface ApiErrorResponse {
 }
 
 export type InquiryMode = "user" | "operator";
-export type AgentVersion = "v1" | "v2";
+export type AgentVersion = "v1" | "v2" | "v3";

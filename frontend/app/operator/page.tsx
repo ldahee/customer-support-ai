@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import HelpButton from "@/components/common/HelpButton";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import SampleExamples from "@/components/common/SampleExamples";
 import OperatorInquiryForm from "@/components/operator/OperatorInquiryForm";
 import ProcessingResult from "@/components/operator/ProcessingResult";
 import OperatorHelpModal from "@/components/operator/OperatorHelpModal";
-import { submitOperatorInquiry } from "@/lib/api";
+import { submitOperatorInquiry, fetchFaqCategories } from "@/lib/api";
 import type { AgentVersion, OperatorInquiryResponse } from "@/lib/types";
 
 export default function OperatorPage() {
@@ -17,6 +17,17 @@ export default function OperatorPage() {
   const [error, setError] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [agentVersion, setAgentVersion] = useState<AgentVersion>("v1");
+  const [faqCategory, setFaqCategory] = useState("");
+  const [faqCategories, setFaqCategories] = useState<string[]>([]);
+
+  // v3 선택 시 카테고리 목록 로드
+  useEffect(() => {
+    if (agentVersion === "v3") {
+      fetchFaqCategories().then(setFaqCategories);
+    } else {
+      setFaqCategory("");
+    }
+  }, [agentVersion]);
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -27,7 +38,11 @@ export default function OperatorPage() {
     setError(null);
 
     try {
-      const data = await submitOperatorInquiry(trimmed, agentVersion);
+      const data = await submitOperatorInquiry(
+        trimmed,
+        agentVersion,
+        agentVersion === "v3" ? faqCategory : undefined
+      );
       setResult(data);
     } catch (err) {
       setError(
@@ -76,6 +91,9 @@ export default function OperatorPage() {
                 isLoading={isLoading}
                 agentVersion={agentVersion}
                 onVersionChange={setAgentVersion}
+                faqCategory={faqCategory}
+                onFaqCategoryChange={setFaqCategory}
+                faqCategories={faqCategories}
               />
             </div>
 

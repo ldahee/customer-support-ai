@@ -33,9 +33,13 @@ class InquiryRequest(BaseModel):
         description="응답 모드. user=최종 답변만, operator=전체 처리 메타데이터 포함",
     )
     conversation_id: Optional[str] = Field(default=None, description="대화 ID (멀티턴용, user 모드 전용)")
-    agent_version: Literal["v1", "v2"] = Field(
+    agent_version: Literal["v1", "v2", "v3"] = Field(
         default="v1",
-        description="에이전트 버전. v1=라우터 방식, v2=Tool Calling 방식",
+        description="에이전트 버전. v1=라우터 방식, v2=Tool Calling 방식, v3=MCP(FAQSearch+SlackNotify) 통합",
+    )
+    faq_category: Optional[str] = Field(
+        default=None,
+        description="v3 전용 FAQ 카테고리 필터. 지정하면 해당 카테고리의 FAQ만 검색.",
     )
 
 
@@ -43,6 +47,7 @@ class ExecutionTraceItem(BaseModel):
     node_name: str
     status: str
     duration_ms: Optional[int] = None
+    error: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -124,6 +129,7 @@ async def respond_to_inquiry(
         locale=body.locale,
         conversation_id=body.conversation_id if body.mode == "user" else None,
         agent_version=body.agent_version,
+        faq_category=body.faq_category,
     )
 
     if "error" in result:
@@ -157,6 +163,9 @@ async def respond_to_inquiry(
         "routing_reason": result.get("routing_reason"),
         "execution_trace": result.get("execution_trace", []),
         "latency_ms": result.get("latency_ms", 0),
+        "mcp_connected": result.get("mcp_connected", False),
+        "faq_context": result.get("faq_context"),
+        "faq_category": result.get("faq_category"),
     }
 
 

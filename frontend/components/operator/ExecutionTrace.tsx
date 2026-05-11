@@ -15,6 +15,9 @@ const NODE_DESCRIPTIONS: Record<string, string> = {
   shipping_expert_agent: "배송 전문 에이전트 — 배송/반품 관련 답변 생성",
   fallback_agent_node: "신뢰도 부족 또는 라우팅 실패 시 일반 답변 생성",
   response_finalize_node: "최종 답변 정리 및 응답 완료 처리",
+  faq_retrieval_node: "FAQ MCP 서버에서 관련 FAQ 검색 (v3)",
+  orchestrator_node_v3: "LLM이 도구를 직접 선택하여 전문가 호출 (v3)",
+  slack_notify_node: "Slack 알림 발송 — fallback 발생 시 (v3)",
 };
 
 function StatusIcon({ status }: { status: string }) {
@@ -28,7 +31,8 @@ function StatusIcon({ status }: { status: string }) {
   if (
     status === "error" ||
     status === "parse_failed" ||
-    status === "skipped_max_calls"
+    status === "skipped_max_calls" ||
+    status === "all_experts_failed"
   ) {
     return (
       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-red-600 text-xs font-bold">
@@ -36,7 +40,7 @@ function StatusIcon({ status }: { status: string }) {
       </span>
     );
   }
-  if (status === "fallback") {
+  if (status === "fallback" || status === "fallback_no_tools") {
     return (
       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 text-yellow-600 text-xs font-bold">
         ↩
@@ -79,16 +83,23 @@ export default function ExecutionTrace({ trace }: ExecutionTraceProps) {
   return (
     <div className="space-y-2">
       {trace.map((item, idx) => (
-        <div key={idx} className="flex items-center gap-3">
-          <StatusIcon status={item.status} />
-          <span className="flex-1 text-sm text-gray-700 font-mono">
-            {formatNodeName(item.node_name)}
-          </span>
-          <NodeTooltip nodeName={item.node_name} />
-          {item.duration_ms !== undefined && (
-            <span className="text-xs text-gray-400 tabular-nums">
-              {item.duration_ms}ms
+        <div key={idx}>
+          <div className="flex items-center gap-3">
+            <StatusIcon status={item.status} />
+            <span className="flex-1 text-sm text-gray-700 font-mono">
+              {formatNodeName(item.node_name)}
             </span>
+            <NodeTooltip nodeName={item.node_name} />
+            {item.duration_ms !== undefined && (
+              <span className="text-xs text-gray-400 tabular-nums">
+                {item.duration_ms}ms
+              </span>
+            )}
+          </div>
+          {item.error && (
+            <p className="ml-8 mt-0.5 text-xs text-red-600 font-mono break-all">
+              {item.error}
+            </p>
           )}
         </div>
       ))}

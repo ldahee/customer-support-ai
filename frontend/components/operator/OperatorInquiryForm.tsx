@@ -10,11 +10,15 @@ interface OperatorInquiryFormProps {
   isLoading: boolean;
   agentVersion: AgentVersion;
   onVersionChange: (version: AgentVersion) => void;
+  faqCategory: string;
+  onFaqCategoryChange: (category: string) => void;
+  faqCategories: string[];
 }
 
 const VERSION_OPTIONS: { value: AgentVersion; label: string; description: string }[] = [
   { value: "v1", label: "v1 · 라우터", description: "분류 후 단일 전문가 호출" },
   { value: "v2", label: "v2 · Tool Calling", description: "LLM이 전문가 도구를 직접 선택" },
+  { value: "v3", label: "v3 · MCP", description: "FAQ 검색 + Slack 알림" },
 ];
 
 export default function OperatorInquiryForm({
@@ -24,6 +28,9 @@ export default function OperatorInquiryForm({
   isLoading,
   agentVersion,
   onVersionChange,
+  faqCategory,
+  onFaqCategoryChange,
+  faqCategories,
 }: OperatorInquiryFormProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -57,6 +64,34 @@ export default function OperatorInquiryForm({
           ))}
         </div>
       </div>
+
+      {/* FAQ 카테고리 선택 (v3 전용) */}
+      {agentVersion === "v3" && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            FAQ 카테고리
+          </p>
+          {faqCategories.length === 0 ? (
+            <p className="text-xs text-gray-400">
+              색인된 카테고리가 없습니다. indexer.py를 실행해 FAQ를 색인하세요.
+            </p>
+          ) : (
+            <select
+              value={faqCategory}
+              onChange={(e) => onFaqCategoryChange(e.target.value)}
+              disabled={isLoading}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 transition"
+            >
+              <option value="">전체 검색</option>
+              {faqCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       <textarea
         value={value}

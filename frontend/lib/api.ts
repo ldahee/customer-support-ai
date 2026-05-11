@@ -18,6 +18,7 @@ interface InquiryRequestBody {
   mode: InquiryMode;
   conversation_id?: string;
   agent_version?: AgentVersion;
+  faq_category?: string;
 }
 
 async function postInquiry<T>(body: InquiryRequestBody): Promise<T> {
@@ -47,22 +48,38 @@ async function postInquiry<T>(body: InquiryRequestBody): Promise<T> {
 
 export async function submitUserInquiry(
   inquiryText: string,
-  conversationId?: string
+  conversationId?: string,
+  agentVersion?: AgentVersion,
+  faqCategory?: string,
 ): Promise<UserInquiryResponse> {
   return postInquiry<UserInquiryResponse>({
     inquiry_text: inquiryText,
     mode: "user",
     conversation_id: conversationId,
+    agent_version: agentVersion,
+    faq_category: faqCategory || undefined,
   });
 }
 
 export async function submitOperatorInquiry(
   inquiryText: string,
-  agentVersion: AgentVersion = "v1"
+  agentVersion: AgentVersion = "v1",
+  faqCategory?: string
 ): Promise<OperatorInquiryResponse> {
   return postInquiry<OperatorInquiryResponse>({
     inquiry_text: inquiryText,
     mode: "operator",
     agent_version: agentVersion,
+    faq_category: faqCategory || undefined,
   });
+}
+
+export async function fetchFaqCategories(): Promise<string[]> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/faq/categories`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }

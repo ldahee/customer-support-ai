@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
@@ -27,6 +27,52 @@ class Settings(BaseSettings):
 
     # Database
     database_url: Optional[str] = None
+
+    # MCP 서버 설정 (선택적 — 미설정 시 MCP 비활성화)
+    mcp_billing_url: Optional[str] = None
+    mcp_account_url: Optional[str] = None
+    mcp_shipping_url: Optional[str] = None
+    mcp_technical_support_url: Optional[str] = None
+    # v3 MCP 서버
+    mcp_faq_url: Optional[str] = None         # FAQSearch MCP 서버 URL
+    mcp_slack_url: Optional[str] = None       # SlackNotify MCP 서버 URL
+    mcp_connect_timeout: float = 5.0
+    mcp_tool_timeout: float = 10.0
+
+    # FAQ MCP 서버 자체 설정 (mcp_servers/faq_search/server.py 에서 읽음)
+    faq_chroma_path: str = "./chroma_db"
+    faq_collection_name: str = "faq"
+
+    # Slack MCP 서버 자체 설정 (mcp_servers/slack_notify/server.py 에서 읽음)
+    slack_webhook_url: Optional[str] = None
+
+    @property
+    def mcp_enabled(self) -> bool:
+        return any([
+            self.mcp_billing_url,
+            self.mcp_account_url,
+            self.mcp_shipping_url,
+            self.mcp_technical_support_url,
+            self.mcp_faq_url,
+            self.mcp_slack_url,
+        ])
+
+    @property
+    def mcp_server_configs(self) -> Dict[str, Dict[str, Any]]:
+        configs: Dict[str, Dict[str, Any]] = {}
+        if self.mcp_billing_url:
+            configs["billing"] = {"url": self.mcp_billing_url, "transport": "streamable_http"}
+        if self.mcp_account_url:
+            configs["account"] = {"url": self.mcp_account_url, "transport": "streamable_http"}
+        if self.mcp_shipping_url:
+            configs["shipping"] = {"url": self.mcp_shipping_url, "transport": "streamable_http"}
+        if self.mcp_technical_support_url:
+            configs["technical_support"] = {"url": self.mcp_technical_support_url, "transport": "streamable_http"}
+        if self.mcp_faq_url:
+            configs["faq"] = {"url": self.mcp_faq_url, "transport": "streamable_http"}
+        if self.mcp_slack_url:
+            configs["slack"] = {"url": self.mcp_slack_url, "transport": "streamable_http"}
+        return configs
 
     # Environment
     environment: str = "development"  # "development" | "production"

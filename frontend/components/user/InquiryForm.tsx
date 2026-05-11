@@ -1,19 +1,36 @@
 "use client";
 
 import { KeyboardEvent } from "react";
+import type { AgentVersion } from "@/lib/types";
 
 interface InquiryFormProps {
   value: string;
   onChange: (text: string) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  agentVersion: AgentVersion;
+  onVersionChange: (version: AgentVersion) => void;
+  faqCategory: string;
+  onFaqCategoryChange: (category: string) => void;
+  faqCategories: string[];
 }
+
+const VERSION_OPTIONS: { value: AgentVersion; label: string; description: string }[] = [
+  { value: "v1", label: "v1 · 라우터", description: "분류 후 단일 전문가 호출" },
+  { value: "v2", label: "v2 · Tool Calling", description: "LLM이 전문가 도구를 직접 선택" },
+  { value: "v3", label: "v3 · MCP", description: "FAQ 검색 + Slack 알림" },
+];
 
 export default function InquiryForm({
   value,
   onChange,
   onSubmit,
   isLoading,
+  agentVersion,
+  onVersionChange,
+  faqCategory,
+  onFaqCategoryChange,
+  faqCategories,
 }: InquiryFormProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -24,6 +41,58 @@ export default function InquiryForm({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 에이전트 버전 선택 */}
+      <div>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          에이전트 버전
+        </p>
+        <div className="flex gap-2">
+          {VERSION_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => onVersionChange(opt.value)}
+              disabled={isLoading}
+              className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-50 ${
+                agentVersion === opt.value
+                  ? "border-blue-400 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              <span className="block text-xs font-semibold">{opt.label}</span>
+              <span className="block text-xs text-gray-400 mt-0.5">{opt.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* FAQ 카테고리 선택 (v3 전용) */}
+      {agentVersion === "v3" && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            FAQ 카테고리
+          </p>
+          {faqCategories.length === 0 ? (
+            <p className="text-xs text-gray-400">
+              색인된 카테고리가 없습니다. indexer.py를 실행해 FAQ를 색인하세요.
+            </p>
+          ) : (
+            <select
+              value={faqCategory}
+              onChange={(e) => onFaqCategoryChange(e.target.value)}
+              disabled={isLoading}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 transition"
+            >
+              <option value="">전체 검색</option>
+              {faqCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

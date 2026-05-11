@@ -39,16 +39,16 @@ function CategoryBadge({ category }: { category: string | null }) {
   );
 }
 
-function VersionBadge({ version }: { version: "v1" | "v2" }) {
+function VersionBadge({ version }: { version: "v1" | "v2" | "v3" }) {
+  const configs: Record<string, { cls: string; label: string }> = {
+    v1: { cls: "bg-gray-100 text-gray-600", label: "v1 · 라우터" },
+    v2: { cls: "bg-emerald-100 text-emerald-700", label: "v2 · Tool Calling" },
+    v3: { cls: "bg-violet-100 text-violet-700", label: "v3 · MCP" },
+  };
+  const { cls, label } = configs[version] ?? configs.v1;
   return (
-    <span
-      className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${
-        version === "v2"
-          ? "bg-emerald-100 text-emerald-700"
-          : "bg-gray-100 text-gray-600"
-      }`}
-    >
-      {version === "v2" ? "v2 · Tool Calling" : "v1 · 라우터"}
+    <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${cls}`}>
+      {label}
     </span>
   );
 }
@@ -108,6 +108,16 @@ export default function ProcessingResult({ result }: ProcessingResultProps) {
             )}
           </InfoRow>
 
+          {result.agent_version === "v3" && (
+            <InfoRow label="MCP 연결">
+              {result.mcp_connected ? (
+                <span className="text-green-600 font-medium">연결됨</span>
+              ) : (
+                <span className="text-red-600 font-medium">미연결</span>
+              )}
+            </InfoRow>
+          )}
+
           <InfoRow label="전체 처리 시간">
             <span className="tabular-nums">{result.latency_ms.toLocaleString()}ms</span>
           </InfoRow>
@@ -130,6 +140,18 @@ export default function ProcessingResult({ result }: ProcessingResultProps) {
           </div>
         )}
       </div>
+
+      {/* v3 FAQ 검색 결과 */}
+      {result.agent_version === "v3" && result.faq_context && (
+        <div className="rounded-xl border border-violet-100 bg-violet-50 p-5">
+          <h3 className="mb-3 text-sm font-semibold text-violet-400 uppercase tracking-wide">
+            검색된 FAQ{result.faq_category && <span className="ml-2 font-normal normal-case text-violet-300">· {result.faq_category}</span>}
+          </h3>
+          <pre className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
+            {result.faq_context}
+          </pre>
+        </div>
+      )}
 
       {/* 실행 흐름 */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">

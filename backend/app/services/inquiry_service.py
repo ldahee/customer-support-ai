@@ -10,6 +10,8 @@ from typing import Optional
 from app.config.database import is_db_enabled, _session_factory
 from app.graphs.inquiry_graph import inquiry_graph
 from app.graphs.inquiry_graph_v2 import inquiry_graph_v2
+from app.graphs.inquiry_graph_v3 import inquiry_graph_v3
+from app.mcp.client import mcp_manager
 from app.repositories.inquiry_repository import ConversationRepository, InquiryRepository
 from app.schemas.inquiry_state import InquiryState
 
@@ -25,6 +27,7 @@ class InquiryService:
         locale: Optional[str] = None,
         conversation_id: Optional[str] = None,
         agent_version: str = "v1",
+        faq_category: Optional[str] = None,
     ) -> dict:
         """
         문의를 처리하고 최종 응답을 반환합니다.
@@ -50,6 +53,8 @@ class InquiryService:
             "agent_version": agent_version,
             "answer": None,
             "expert_answers": None,
+            "faq_context": None,
+            "faq_category": faq_category or None,
             "safety_flag": None,
             "fallback_used": False,
             "retry_count": 0,
@@ -58,7 +63,12 @@ class InquiryService:
             "execution_trace": [],
         }
 
-        graph = inquiry_graph_v2 if agent_version == "v2" else inquiry_graph
+        if agent_version == "v3":
+            graph = inquiry_graph_v3
+        elif agent_version == "v2":
+            graph = inquiry_graph_v2
+        else:
+            graph = inquiry_graph
         try:
             final_state: InquiryState = await graph.ainvoke(initial_state)
         except Exception as e:
@@ -105,6 +115,9 @@ class InquiryService:
             "execution_trace": final_state.get("execution_trace", []),
             "latency_ms": latency_ms,
             "conversation_id": conversation_id,
+            "mcp_connected": mcp_manager.is_available,
+            "faq_context": final_state.get("faq_context"),
+            "faq_category": final_state.get("faq_category"),
         }
 
         if answer:
@@ -176,6 +189,7 @@ class InquiryService:
                     latency_ms=latency_ms,
                     error=state.get("error"),
                     execution_trace=state.get("execution_trace", []),
+                    agent_version=state.get("agent_version"),
                 )
         except Exception as e:
             logger.error("[%s] DB 저장 실패 (응답에는 영향 없음): %s", state.get("inquiry_id"), e)
