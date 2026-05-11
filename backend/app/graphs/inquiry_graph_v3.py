@@ -49,52 +49,34 @@ async def faq_retrieval_node(state: InquiryState) -> dict:
     start = time.monotonic()
     trace = list(state.get("execution_trace", []))
 
-    if not mcp_manager.is_available:
-        trace.append({
-            "node_name": "faq_retrieval_node",
-            "status": "error",
-            "duration_ms": 0,
-            "error": "MCP 서버에 연결되지 않았습니다.",
-        })
-        return {"faq_context": None, "execution_trace": trace}
-
-    tools = mcp_manager.get_tools("faq")
-    if not tools:
-        logger.debug("[%s] faq_retrieval_node: FAQ MCP 미설정, 건너뜀", inquiry_id)
-        trace.append({
-            "node_name": "faq_retrieval_node",
-            "status": "error",
-            "duration_ms": 0,
-            "error": "FAQ MCP 서버가 설정되지 않았습니다.",
-        })
-        return {"faq_context": None, "execution_trace": trace}
-
-    faq_tool = next((t for t in tools if t.name == "faq_search"), None)
-    if not faq_tool:
-        trace.append({
-            "node_name": "faq_retrieval_node",
-            "status": "error",
-            "duration_ms": 0,
-            "error": "faq_search 도구를 찾을 수 없습니다.",
-        })
-        return {"faq_context": None, "execution_trace": trace}
-
     category = state.get("faq_category") or ""
     try:
-        result = await faq_tool.ainvoke({"query": state["inquiry_text"], "category": category})
-        duration_ms = int((time.monotonic() - start) * 1000)
-        if result:
-            logger.info(
-                "[%s] faq_retrieval_node: %d chars fetched in %dms (category=%s)",
-                inquiry_id, len(result), duration_ms, category or "전체",
-            )
-        trace.append({
-            "node_name": "faq_retrieval_node",
-            "status": "completed",
-            "duration_ms": duration_ms,
-            "error": None,
-        })
-        return {"faq_context": result or None, "execution_trace": trace}
+        async with mcp_manager.session_tools("faq") as tools:
+            faq_tool = next((t for t in tools if t.name == "faq_search"), None)
+            if not faq_tool:
+                logger.debug("[%s] faq_retrieval_node: faq_search 도구 없음, 건너뜀", inquiry_id)
+                trace.append({
+                    "node_name": "faq_retrieval_node",
+                    "status": "error",
+                    "duration_ms": 0,
+                    "error": "faq_search 도구를 찾을 수 없습니다.",
+                })
+                return {"faq_context": None, "execution_trace": trace}
+
+            result = await faq_tool.ainvoke({"query": state["inquiry_text"], "category": category})
+            duration_ms = int((time.monotonic() - start) * 1000)
+            if result:
+                logger.info(
+                    "[%s] faq_retrieval_node: %d chars fetched in %dms (category=%s)",
+                    inquiry_id, len(result), duration_ms, category or "전체",
+                )
+            trace.append({
+                "node_name": "faq_retrieval_node",
+                "status": "completed",
+                "duration_ms": duration_ms,
+                "error": None,
+            })
+            return {"faq_context": result or None, "execution_trace": trace}
     except Exception as e:
         duration_ms = int((time.monotonic() - start) * 1000)
         logger.warning("[%s] faq_retrieval_node failed (continuing without FAQ): %s", inquiry_id, e)
@@ -241,36 +223,6 @@ async def slack_notify_node(state: InquiryState) -> dict:
     start = time.monotonic()
     trace = list(state.get("execution_trace", []))
 
-    if not mcp_manager.is_available:
-        trace.append({
-            "node_name": "slack_notify_node",
-            "status": "error",
-            "duration_ms": 0,
-            "error": "MCP 서버에 연결되지 않았습니다.",
-        })
-        return {"execution_trace": trace}
-
-    tools = mcp_manager.get_tools("slack")
-    if not tools:
-        logger.debug("[%s] slack_notify_node: Slack MCP 미설정, 건너뜀", inquiry_id)
-        trace.append({
-            "node_name": "slack_notify_node",
-            "status": "error",
-            "duration_ms": 0,
-            "error": "Slack MCP 서버가 설정되지 않았습니다.",
-        })
-        return {"execution_trace": trace}
-
-    notify_tool = next((t for t in tools if t.name == "slack_notify"), None)
-    if not notify_tool:
-        trace.append({
-            "node_name": "slack_notify_node",
-            "status": "error",
-            "duration_ms": 0,
-            "error": "slack_notify 도구를 찾을 수 없습니다.",
-        })
-        return {"execution_trace": trace}
-
     inquiry_preview = state["inquiry_text"][:200]
     if len(state["inquiry_text"]) > 200:
         inquiry_preview += "..."
@@ -286,16 +238,28 @@ async def slack_notify_node(state: InquiryState) -> dict:
     )
 
     try:
-        result = await notify_tool.ainvoke({"message": message})
-        duration_ms = int((time.monotonic() - start) * 1000)
-        logger.info("[%s] slack_notify_node: %s", inquiry_id, result)
-        trace.append({
-            "node_name": "slack_notify_node",
-            "status": "completed",
-            "duration_ms": duration_ms,
-            "error": None,
-        })
-        return {"execution_trace": trace}
+        async with mcp_manager.session_tools("slack") as tools:
+            notify_tool = next((t for t in tools if t.name == "slack_notify"), None)
+            if not notify_tool:
+                logger.debug("[%s] slack_notify_node: slack_notify 도구 없음, 건너뜀", inquiry_id)
+                trace.append({
+                    "node_name": "slack_notify_node",
+                    "status": "error",
+                    "duration_ms": 0,
+                    "error": "slack_notify 도구를 찾을 수 없습니다.",
+                })
+                return {"execution_trace": trace}
+
+            result = await notify_tool.ainvoke({"message": message})
+            duration_ms = int((time.monotonic() - start) * 1000)
+            logger.info("[%s] slack_notify_node: %s", inquiry_id, result)
+            trace.append({
+                "node_name": "slack_notify_node",
+                "status": "completed",
+                "duration_ms": duration_ms,
+                "error": None,
+            })
+            return {"execution_trace": trace}
     except Exception as e:
         duration_ms = int((time.monotonic() - start) * 1000)
         logger.warning("[%s] slack_notify_node failed (ignored): %s", inquiry_id, e)
