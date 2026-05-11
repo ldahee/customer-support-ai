@@ -4,6 +4,8 @@ LangChain + LangGraph 기반 멀티 에이전트 고객 문의 분류 및 답변
 
 고객 문의를 자동으로 분류하여 전문 에이전트가 답변을 생성하고, 운영자는 처리 과정의 메타데이터를 실시간으로 확인할 수 있습니다.
 
+**🔗 라이브 데모**: https://inquiry-triage-twgufdhcu-dhlee9706-8410s-projects.vercel.app
+
 ---
 
 ## 스크린샷
@@ -11,6 +13,7 @@ LangChain + LangGraph 기반 멀티 에이전트 고객 문의 분류 및 답변
 **고객 화면 (User Mode)** — 문의를 입력하면 최종 답변만 표시
 ![이미지](docs/screenshots/user_1.png)
 ![이미지](docs/screenshots/user_2.png)
+![이미지](docs/screenshots/user_3.png)
 
 **운영자 화면 (Operator Mode)** — 분류 카테고리, 신뢰도, 실행 트레이스 등 내부 메타데이터 표시
 ![이미지](docs/screenshots/operator_1.png)
@@ -26,9 +29,9 @@ LangChain + LangGraph 기반 멀티 에이전트 고객 문의 분류 및 답변
 
 ## 아키텍처
 
-두 가지 파이프라인을 제공합니다. 운영자 화면에서 버전을 선택해 동일 문의에 대한 결과를 비교할 수 있습니다.
+세 가지 파이프라인을 제공합니다. 운영자 화면에서 버전을 선택해 동일 문의에 대한 결과를 비교할 수 있습니다.
 
-### v1 · 라우터 방식 (기본)
+### v1 · 라우터 방식
 
 ```
 고객 문의 입력
@@ -55,9 +58,7 @@ router_node                           │
             END
 ```
 
-라우터가 문의를 카테고리로 분류한 뒤 해당 전문가 하나를 호출합니다. 신뢰도(confidence)가 0.50 미만이면 Fallback Agent로 처리됩니다.
-
-**분류 카테고리**
+라우터 LLM이 문의를 5개 카테고리 중 하나로 분류하고 해당 전문가를 단일 호출합니다. 신뢰도(confidence)가 0.50 미만이면 Fallback Agent로 처리됩니다.
 
 | 카테고리 | 설명 |
 |---|---|
@@ -66,6 +67,14 @@ router_node                           │
 | `technical_support` | 기술 문제, 오류, 사용법 관련 |
 | `shipping` | 배송, 배달, 반품 관련 |
 | `general` | 위 카테고리에 해당하지 않는 일반 문의 |
+
+**장점** — 구조가 단순하고 LLM 호출이 2회로 비용이 낮습니다. confidence 점수로 라우터의 불확실성을 측정할 수 있습니다.
+
+**한계** — 라우터가 반드시 카테고리 하나를 선택해야 하므로, "결제가 안 되고 로그인도 안 돼요" 같은 복합 문의는 핵심 의도 하나만 처리됩니다. 또한 라우터가 오분류하면 완전히 다른 전문가가 답변하게 됩니다.
+
+→ **v2 전환 이유**: 복합 문의를 단일 전문가로 처리하는 구조적 한계를 해결하기 위해 LLM이 필요한 전문가를 직접 선택하는 Tool Calling 방식으로 전환했습니다.
+
+---
 
 ### v2 · Tool Calling 방식
 
@@ -89,6 +98,14 @@ orchestrator_node                     │
 ```
 
 라우터 없이 오케스트레이터 LLM이 `billing_expert`, `account_expert`, `technical_support_expert`, `shipping_expert` tool 중 필요한 것을 직접 선택합니다. 복합 문의에서는 여러 전문가를 병렬로 호출하고 synthesizer가 통합 답변을 생성합니다.
+
+**장점** — 카테고리 분류 단계 없이 LLM이 의도를 직접 파악해 전문가를 선택합니다. 복합 문의에서 여러 전문가를 병렬로 호출해 완결성 있는 답변을 생성할 수 있습니다.
+
+**한계** — 전문가 에이전트가 실제 서비스의 FAQ나 정책 데이터를 알지 못한 채 일반적인 답변만 생성합니다. "환불이 며칠 걸리나요?"처럼 구체적인 수치가 필요한 문의에서는 답변의 구체성이 떨어집니다. 또한 fallback이 발생해도 운영자가 이를 인지할 방법이 없습니다.
+
+→ **v3 전환 이유**: 실제 FAQ 데이터를 에이전트에게 주입해 답변의 구체성을 높이고, fallback 발생 시 운영자 알림을 추가하기 위해 MCP 통합으로 확장했습니다.
+
+---
 
 ### v3 · MCP 통합 방식
 
@@ -117,7 +134,24 @@ orchestrator_node                     │
                               │(fallback=True) ──► slack_notify_node ──► END
 ```
 
-v2에 두 가지 MCP 연동을 추가합니다. `faq_retrieval_node`가 FAQSearch MCP 서버에서 관련 FAQ를 조회한 뒤 orchestrator 프롬프트와 전문가 호출 시 context로 주입합니다. Fallback이 발생하면 `slack_notify_node`가 SlackNotify MCP 서버를 통해 운영자에게 알림을 발송합니다. MCP 서버가 미설정이거나 연결 실패 시 해당 노드를 스킵하고 파이프라인은 계속 동작합니다.
+`faq_retrieval_node`가 FAQSearch MCP 서버에서 관련 FAQ를 의미 검색으로 조회한 뒤 orchestrator 프롬프트와 전문가 `inquiry_text`에 주입합니다. Fallback이 발생하면 `slack_notify_node`가 SlackNotify MCP 서버를 통해 운영자에게 알림을 발송합니다. MCP 서버가 미설정이거나 연결 실패 시 해당 노드를 스킵하고 파이프라인은 계속 동작합니다.
+
+**장점** — 실제 FAQ 데이터 기반으로 구체적인 답변을 생성합니다. Fallback 발생 시 Slack 알림으로 운영 가시성을 확보할 수 있습니다. MCP 서버 단위로 기능을 독립 배포하고 점진적으로 도입할 수 있습니다.
+
+**한계** — FAQSearch MCP 서버와 ChromaDB를 별도로 운영해야 합니다. FAQ 검색 레이턴시가 추가되며, FAQ 데이터가 없으면 v2 대비 이점이 없습니다.
+
+---
+
+### 버전 비교
+
+| 항목 | v1 (라우터) | v2 (Tool Calling) | v3 (MCP 통합) |
+|---|---|---|---|
+| 전문가 선택 | 라우터 LLM이 카테고리 분류 | 오케스트레이터 LLM이 tool 직접 선택 | 오케스트레이터 LLM이 tool 직접 선택 |
+| 복합 문의 | 단일 전문가(핵심 의도 기준) | 복수 전문가 병렬 호출 후 합성 | 복수 전문가 병렬 호출 후 합성 |
+| LLM 호출 수 | 2회(라우터 + 전문가) | 2~N회(오케스트레이터 + 전문가 수) | 2~N회(오케스트레이터 + 전문가 수) |
+| 신뢰도 지표 | confidence 점수 제공 | 없음 | 없음 |
+| FAQ RAG | 없음 | 없음 | FAQSearch MCP로 관련 FAQ 주입 |
+| Fallback 알림 | 없음 | 없음 | SlackNotify MCP로 운영자 알림 |
 
 ---
 
@@ -149,18 +183,9 @@ except Exception as e:
 
 `DATABASE_URL` 환경 변수를 설정하지 않으면 DB 저장 로직이 아예 실행되지 않습니다. DB 저장 실패가 발생해도 고객 응답에는 영향을 주지 않습니다. 이를 통해 로컬 개발 시 PostgreSQL 없이도 전체 기능을 실행할 수 있으며, DB 장애가 서비스 중단으로 이어지지 않습니다.
 
-### 6. v1 · v2 파이프라인 비교 구조
+### 6. 파이프라인 코드 재사용 구조
 
-v1(라우터)과 v2(Tool Calling)는 동일한 Safety 체크, Fallback, response_finalize 로직을 공유합니다. 전문가 체인(`billing_chain`, `account_chain` 등)도 공유되어 v2에서 재사용됩니다. API의 `agent_version` 파라미터로 버전을 선택하며, 운영자 화면에서 토글로 쉽게 전환할 수 있습니다.
-
-| 항목 | v1 (라우터) | v2 (Tool Calling) | v3 (MCP 통합) |
-|---|---|---|---|
-| 전문가 선택 | 라우터 LLM이 카테고리 분류 | 오케스트레이터 LLM이 tool 직접 선택 | 오케스트레이터 LLM이 tool 직접 선택 |
-| 복합 문의 | 단일 전문가(핵심 의도 기준) | 복수 전문가 병렬 호출 후 합성 | 복수 전문가 병렬 호출 후 합성 |
-| LLM 호출 수 | 2회(라우터 + 전문가) | 2~N회(오케스트레이터 + 전문가 수) | 2~N회(오케스트레이터 + 전문가 수) |
-| 신뢰도 지표 | confidence 점수 제공 | 없음 | 없음 |
-| FAQ RAG | 없음 | 없음 | FAQSearch MCP로 관련 FAQ 주입 |
-| Fallback 알림 | 없음 | 없음 | SlackNotify MCP로 운영자 알림 |
+세 버전은 `input_node`, `safety_check_node`, `response_finalize_node`와 전문가 체인(`billing_chain` 등)을 공유합니다. v3를 추가할 때 `faq_retrieval_node`와 `slack_notify_node` 두 노드만 작성하면 됐습니다. API의 `agent_version` 파라미터로 버전을 선택하며, 운영자 화면에서 토글로 전환할 수 있습니다.
 
 ### 7. MCP Graceful Degradation
 
