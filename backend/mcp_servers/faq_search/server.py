@@ -44,7 +44,7 @@ except Exception as e:
     logger.error("ChromaDB 초기화 실패: %s", e)
     _collection = None
 
-mcp = FastMCP("faq-search")
+mcp = FastMCP("faq-search", host=HOST, port=PORT)
 
 
 @mcp.tool()
@@ -97,4 +97,4 @@ async def faq_search(query: str, category: str = "", top_k: int = 3) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http", host=HOST, port=PORT, path="/mcp")
+    mcp.run(transport="streamable-http", path="/mcp")

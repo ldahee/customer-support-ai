@@ -31,7 +31,7 @@ PORT = int(os.environ.get("PORT", os.environ.get("MCP_SLACK_PORT", "8011")))
 if not SLACK_WEBHOOK_URL:
     logger.warning("SLACK_WEBHOOK_URL이 설정되지 않았습니다. 알림이 발송되지 않습니다.")
 
-mcp = FastMCP("slack-notify")
+mcp = FastMCP("slack-notify", host=HOST, port=PORT)
 
 
 @mcp.tool()
@@ -66,4 +66,4 @@ async def slack_notify(message: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http", host=HOST, port=PORT, path="/mcp")
+    mcp.run(transport="streamable-http", path="/mcp")
