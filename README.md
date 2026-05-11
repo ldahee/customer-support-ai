@@ -4,7 +4,7 @@ LangChain + LangGraph 기반 멀티 에이전트 고객 문의 분류 및 답변
 
 고객 문의를 자동으로 분류하여 전문 에이전트가 답변을 생성하고, 운영자는 처리 과정의 메타데이터를 실시간으로 확인할 수 있습니다.
 
-**🔗 라이브 데모**: https://inquiry-triage-twgufdhcu-dhlee9706-8410s-projects.vercel.app
+**🔗 라이브 데모**: https://inquiry-triage-ai.vercel.app
 
 ---
 
@@ -13,11 +13,13 @@ LangChain + LangGraph 기반 멀티 에이전트 고객 문의 분류 및 답변
 **고객 화면 (User Mode)** — 문의를 입력하면 최종 답변만 표시
 ![이미지](docs/screenshots/user_1.png)
 ![이미지](docs/screenshots/user_2.png)
-![이미지](docs/screenshots/user_3.png)
 
 **운영자 화면 (Operator Mode)** — 분류 카테고리, 신뢰도, 실행 트레이스 등 내부 메타데이터 표시
 ![이미지](docs/screenshots/operator_1.png)
 ![이미지](docs/screenshots/operator_2.png)
+
+**slack 연동**
+![이미지](docs/screenshots/slack.png)
 
 ---
 
