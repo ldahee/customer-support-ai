@@ -5,10 +5,12 @@ End-to-End 파이프라인 평가 스크립트.
 
 실행:
     cd backend
-    python -m tests.eval.eval_e2e                              # 전체
+    python -m tests.eval.eval_e2e                              # v1 전체 (기본)
+    python -m tests.eval.eval_e2e --version v2                 # v2 평가
+    python -m tests.eval.eval_e2e --version v3                 # v3 평가
     python -m tests.eval.eval_e2e --difficulty hard            # 난이도 필터
     python -m tests.eval.eval_e2e --pattern cross_domain       # hard 패턴 필터
-    python -m tests.eval.eval_e2e --output tests/eval/results/e2e_results.json        # JSON 저장
+    python -m tests.eval.eval_e2e --output tests/eval/results/e2e_results.json  # 경로 지정
 
 검증 항목 (자동):
     1. safety_flag == False         모든 케이스 공통
@@ -36,8 +38,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
 from app.graphs.inquiry_graph import inquiry_graph
+from app.graphs.inquiry_graph_v2 import inquiry_graph_v2
+from app.graphs.inquiry_graph_v3 import inquiry_graph_v3
 from app.config.settings import settings
 from tests.eval.e2e_testset import E2E_TESTSET
+
+GRAPH_MAP = {"v1": inquiry_graph, "v2": inquiry_graph_v2, "v3": inquiry_graph_v3}
 
 CATEGORIES = ["billing", "account", "technical_support", "shipping", "general"]
 DIFFICULTIES = ["easy", "medium", "hard"]
@@ -140,6 +146,7 @@ def make_initial_state(inquiry_text: str) -> dict:
         "confidence": None,
         "routing_reason": None,
         "selected_agent": None,
+        "selected_agents": None,
         "answer": None,
         "safety_flag": None,
         "fallback_used": False,
@@ -147,6 +154,8 @@ def make_initial_state(inquiry_text: str) -> dict:
         "llm_call_count": 0,
         "error": None,
         "execution_trace": [],
+        "faq_context": None,
+        "faq_category": None,
     }
 
 
@@ -187,14 +196,15 @@ def validate_pipeline(case: dict, state: dict) -> dict:
 # 평가 실행
 # ──────────────────────────────────────────────
 
-async def evaluate_single(case: dict) -> dict:
+async def evaluate_single(case: dict, agent_version: str = "v1") -> dict:
+    graph = GRAPH_MAP[agent_version]
     start = time.monotonic()
 
     # 1. 전체 파이프라인 실행
     try:
-        final_state = await inquiry_graph.ainvoke(make_initial_state(case["text"]))
+        final_state = await graph.ainvoke(make_initial_state(case["text"]))
     except Exception as e:
-        return {**case, "error": f"Graph execution failed: {e}"}
+        return {**case, "agent_version": agent_version, "error": f"Graph execution failed: {e}"}
 
     total_latency_ms = int((time.monotonic() - start) * 1000)
 
@@ -208,13 +218,18 @@ async def evaluate_single(case: dict) -> dict:
         for t in trace if "node_name" in t
     }
 
+    selected_agents = final_state.get("selected_agents") or []
     result = {
         **case,
+        "agent_version": agent_version,
         "answer": final_state.get("answer", ""),
         "actual_category": final_state.get("category"),
         "actual_confidence": final_state.get("confidence"),
         "actual_fallback_used": final_state.get("fallback_used"),
         "actual_selected_agent": final_state.get("selected_agent"),
+        "actual_selected_agents": selected_agents,
+        "multi_expert_used": len(selected_agents) > 1,
+        "faq_hit": final_state.get("faq_context") is not None,
         "llm_call_count": final_state.get("llm_call_count", 0),
         "total_latency_ms": total_latency_ms,
         "node_latencies": node_latencies,
@@ -247,6 +262,7 @@ async def run_evaluation(
     difficulty: Optional[str] = None,
     pattern: Optional[str] = None,
     concurrency: int = 3,
+    agent_version: str = "v1",
 ) -> list[dict]:
     cases = E2E_TESTSET
 
@@ -259,14 +275,14 @@ async def run_evaluation(
         print("조건에 맞는 케이스가 없습니다.")
         return []
 
-    print(f"\nE2E 평가 시작: {len(cases)}개 케이스 (concurrency={concurrency})")
+    print(f"\nE2E 평가 시작 [{agent_version}]: {len(cases)}개 케이스 (concurrency={concurrency})")
     print("─" * 75)
 
     semaphore = asyncio.Semaphore(concurrency)
 
     async def run_with_semaphore(case: dict, idx: int) -> dict:
         async with semaphore:
-            result = await evaluate_single(case)
+            result = await evaluate_single(case, agent_version=agent_version)
             if "error" in result:
                 print(f"[{idx+1:03d}/{len(cases)}] ERROR  {result['error'][:50]}")
                 return result
@@ -278,10 +294,11 @@ async def run_evaluation(
             c = result.get("completeness", "-")
             s = result.get("safety", "-")
             auto = "✓" if result["checks"]["all_auto_pass"] else "✗"
+            cat = result.get('actual_category') or 'none'
             print(
                 f"[{idx+1:03d}/{len(cases)}] {passed} [{diff_label}{pattern_label}] "
                 f"auto={auto} R={r} C={c} S={s} "
-                f"{result['actual_category']:>20s}({result.get('actual_confidence', 0) or 0:.2f})  "
+                f"{cat:>20s}({result.get('actual_confidence', 0) or 0:.2f})  "
                 f"{result['text'][:35]}"
             )
             return result
@@ -303,18 +320,28 @@ def print_report(results: list[dict]) -> None:
     total = len(valid)
     passed = sum(1 for r in valid if r.get("pass"))
     error_count = len(results) - total
+    version = valid[0].get("agent_version", "v1") if valid else "v1"
 
     def avg(key, group):
         vals = [r[key] for r in group if key in r]
         return sum(vals) / len(vals) if vals else 0
 
+    def rate(key, group):
+        vals = [r[key] for r in group if key in r]
+        return sum(1 for v in vals if v) / len(vals) * 100 if vals else 0
+
     print("\n" + "═" * 75)
-    print("E2E 파이프라인 평가 리포트")
+    print(f"E2E 파이프라인 평가 리포트 [{version}]")
     print("═" * 75)
     print(f"전체 합격률      : {passed}/{total}  ({passed/total*100:.1f}%)")
     print(f"에러 케이스      : {error_count}건")
     print(f"평균 총 레이턴시  : {avg('total_latency_ms', valid):.0f}ms")
     print(f"평균 LLM 호출 수 : {avg('llm_call_count', valid):.1f}회")
+    print(f"Fallback 발생률  : {rate('actual_fallback_used', valid):.1f}%")
+    if version in ("v2", "v3"):
+        print(f"복합 문의 처리율 : {rate('multi_expert_used', valid):.1f}%")
+    if version == "v3":
+        print(f"FAQ 히트율       : {rate('faq_hit', valid):.1f}%")
 
     # 자동 검증 항목별 집계
     print("\n[자동 검증 항목별 통과율]")
@@ -401,6 +428,12 @@ def parse_args() -> argparse.Namespace:
         "--concurrency", type=int, default=3,
         help="동시 처리 수. 파이프라인 1회 = LLM 3~4회 호출이므로 기본값 3 권장",
     )
+    parser.add_argument(
+        "--version",
+        choices=["v1", "v2", "v3"],
+        default="v1",
+        help="평가할 에이전트 버전 (기본값: v1)",
+    )
     parser.add_argument("--output", default=None, help="결과 저장 JSON 경로")
     return parser.parse_args()
 
@@ -411,6 +444,7 @@ async def main() -> None:
         difficulty=args.difficulty,
         pattern=args.pattern,
         concurrency=args.concurrency,
+        agent_version=args.version,
     )
 
     if not results:
@@ -418,10 +452,10 @@ async def main() -> None:
 
     print_report(results)
 
-    if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"\n결과 저장 완료: {args.output}")
+    output = args.output or f"tests/eval/results/{args.version}_e2e_results.json"
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"\n결과 저장 완료: {output}")
 
 
 if __name__ == "__main__":

@@ -15,8 +15,12 @@ unified_testset.py 의 케이스를 LangSmith 데이터셋으로 업로드하고
     # 데이터셋 업로드 (최초 1회 또는 --sync 로 강제 갱신)
     python -m tests.eval.langsmith_eval upload
 
-    # 전체 평가 실행
+    # 전체 평가 실행 (v1 기본)
     python -m tests.eval.langsmith_eval run
+
+    # 버전 지정 평가
+    python -m tests.eval.langsmith_eval run --version v2
+    python -m tests.eval.langsmith_eval run --version v3
 
     # 특정 케이스만 평가 (eval_targets 기준)
     python -m tests.eval.langsmith_eval run --target safety
@@ -24,7 +28,7 @@ unified_testset.py 의 케이스를 LangSmith 데이터셋으로 업로드하고
     python -m tests.eval.langsmith_eval run --target quality
 
     # 난이도 필터
-    python -m tests.eval.langsmith_eval run --difficulty hard
+    python -m tests.eval.langsmith_eval run --difficulty hard --version v2
 
     # 텍스트 길이 필터
     python -m tests.eval.langsmith_eval run --length long
@@ -53,8 +57,12 @@ from langsmith.evaluation import aevaluate
 from pydantic import BaseModel, Field
 
 from app.graphs.inquiry_graph import inquiry_graph
+from app.graphs.inquiry_graph_v2 import inquiry_graph_v2
+from app.graphs.inquiry_graph_v3 import inquiry_graph_v3
 from app.config.settings import settings
 from tests.eval.unified_testset import UNIFIED_TESTSET
+
+GRAPH_MAP = {"v1": inquiry_graph, "v2": inquiry_graph_v2, "v3": inquiry_graph_v3}
 
 DATASET_NAME = "inquiry-triage-unified-eval"
 JUDGE_MODEL = "gpt-4o"
@@ -136,6 +144,7 @@ def _make_initial_state(inquiry_text: str) -> dict:
         "confidence": None,
         "routing_reason": None,
         "selected_agent": None,
+        "selected_agents": None,
         "answer": None,
         "safety_flag": None,
         "fallback_used": False,
@@ -143,25 +152,36 @@ def _make_initial_state(inquiry_text: str) -> dict:
         "llm_call_count": 0,
         "error": None,
         "execution_trace": [],
+        "faq_context": None,
+        "faq_category": None,
     }
 
 
-async def pipeline_target(inputs: dict) -> dict:
-    """전체 파이프라인을 실행하고 LangSmith에 기록할 출력을 반환합니다."""
-    state = _make_initial_state(inputs["inquiry_text"])
-    result = await inquiry_graph.ainvoke(state)
-    return {
-        "safety_flag": result.get("safety_flag"),
-        "is_safe": not result.get("safety_flag", True),
-        "category": result.get("category"),
-        "confidence": result.get("confidence"),
-        "fallback_used": result.get("fallback_used"),
-        "selected_agent": result.get("selected_agent"),
-        "answer": result.get("answer", ""),
-        "llm_call_count": result.get("llm_call_count", 0),
-        "execution_trace": result.get("execution_trace", []),
-        "pipeline_error": result.get("error"),
-    }
+def _make_pipeline_target(agent_version: str = "v1"):
+    """지정한 버전의 graph를 실행하는 LangSmith pipeline_target 함수를 반환합니다."""
+    graph = GRAPH_MAP[agent_version]
+
+    async def pipeline_target(inputs: dict) -> dict:
+        state = _make_initial_state(inputs["inquiry_text"])
+        result = await graph.ainvoke(state)
+        selected_agents = result.get("selected_agents") or []
+        return {
+            "safety_flag": result.get("safety_flag"),
+            "is_safe": not result.get("safety_flag", True),
+            "category": result.get("category"),
+            "confidence": result.get("confidence"),
+            "fallback_used": result.get("fallback_used"),
+            "selected_agent": result.get("selected_agent"),
+            "selected_agents": selected_agents,
+            "multi_expert_used": len(selected_agents) > 1,
+            "faq_hit": result.get("faq_context") is not None,
+            "answer": result.get("answer", ""),
+            "llm_call_count": result.get("llm_call_count", 0),
+            "execution_trace": result.get("execution_trace", []),
+            "pipeline_error": result.get("error"),
+        }
+
+    return pipeline_target
 
 
 # ──────────────────────────────────────────────
@@ -384,6 +404,7 @@ async def run_evaluation(
     text_length: Optional[str] = None,
     experiment_prefix: str = "inquiry-triage",
     max_concurrency: int = 3,
+    agent_version: str = "v1",
 ) -> None:
     """LangSmith evaluate()를 실행합니다."""
 
@@ -405,15 +426,14 @@ async def run_evaluation(
     evaluators = target_map.get(target_eval, all_evaluators) if target_eval else all_evaluators
 
     # 필터 조건을 experiment_prefix에 반영
-    suffix_parts = []
+    suffix_parts = [agent_version]
     if difficulty:
         suffix_parts.append(difficulty)
     if text_length:
         suffix_parts.append(text_length)
     if target_eval:
         suffix_parts.append(target_eval)
-    if suffix_parts:
-        experiment_prefix = f"{experiment_prefix}-{'-'.join(suffix_parts)}"
+    experiment_prefix = f"{experiment_prefix}-{'-'.join(suffix_parts)}"
 
     # 평가 대상 데이터셋 필터링
     # LangSmith는 전체 데이터셋을 사용하므로, 평가자 내부에서 eval_targets로 스킵 처리됨.
@@ -465,12 +485,13 @@ async def run_evaluation(
     print("─" * 65)
 
     results = await aevaluate(
-        pipeline_target,
+        _make_pipeline_target(agent_version),
         data=dataset_name,
         evaluators=evaluators,
         experiment_prefix=experiment_prefix,
         max_concurrency=max_concurrency,
         metadata={
+            "agent_version": agent_version,
             "difficulty_filter": difficulty or "all",
             "length_filter": text_length or "all",
             "eval_target": target_eval or "all",
@@ -534,6 +555,13 @@ def parse_args() -> argparse.Namespace:
         default=3,
         dest="max_concurrency",
     )
+    run_parser.add_argument(
+        "--version",
+        choices=["v1", "v2", "v3"],
+        default="v1",
+        dest="agent_version",
+        help="평가할 에이전트 버전 (기본값: v1)",
+    )
 
     return parser.parse_args()
 
@@ -550,6 +578,7 @@ async def async_main() -> None:
             text_length=args.text_length,
             experiment_prefix=args.experiment_prefix,
             max_concurrency=args.max_concurrency,
+            agent_version=args.agent_version,
         )
 
 
