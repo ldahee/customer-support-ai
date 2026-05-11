@@ -14,6 +14,7 @@ Slack Incoming Webhook으로 알림을 발송합니다.
 """
 import logging
 import os
+from contextlib import asynccontextmanager
 
 import httpx
 from dotenv import load_dotenv
@@ -41,10 +42,22 @@ async def _health(request):
     return JSONResponse({"status": "ok"})
 
 
-asgi_app = Starlette(routes=[
-    Route("/health", _health),
-    Mount("/", app=mcp.streamable_http_app()),
-])
+_mcp_app = mcp.streamable_http_app()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    async with _mcp_app.router.lifespan_context(_mcp_app):
+        yield
+
+
+asgi_app = Starlette(
+    lifespan=lifespan,
+    routes=[
+        Route("/health", _health),
+        Mount("/", app=_mcp_app),
+    ],
+)
 
 
 @mcp.tool()
